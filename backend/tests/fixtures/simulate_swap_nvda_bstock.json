@@ -1,0 +1,12 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "status": "FAILED",
+    "failReason": "execution reverted: BEP20: transfer amount exceeds allowance",
+    "balanceChanges": [],
+    "allowanceChanges": []
+  },
+  "timestamp": 1790891630829,
+  "success": true
+}

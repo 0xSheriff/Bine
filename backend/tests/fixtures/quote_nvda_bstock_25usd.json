@@ -1,0 +1,91 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": [
+    {
+      "quoteId": "a5f0f889020345f6a99db004c452ad07",
+      "vendorName": "LiquidMesh",
+      "executionMode": "SWAP",
+      "binanceChainId": "56",
+      "fromTokenAmount": "25000000000000000000",
+      "toTokenAmount": "108062775280339130",
+      "tradeFee": "0.018687",
+      "estimateGasFee": "450000",
+      "priceImpactPercent": "0.0036706232",
+      "router": "0x55d398326f99059ff775485246999027b3197955--0xca750ef65f295bbecd685abf54e82caf297bdb61--0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+      "fromToken": {
+        "tokenContractAddress": "0x55d398326f99059fF775485246999027B3197955",
+        "tokenSymbol": "USDT",
+        "tokenUnitPrice": "0.999642699593911",
+        "decimal": "18",
+        "isHoneyPot": false,
+        "taxRate": "0"
+      },
+      "toToken": {
+        "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+        "tokenSymbol": "NVDAB",
+        "tokenUnitPrice": "231.41995646059929070260000000",
+        "decimal": "18",
+        "isHoneyPot": false,
+        "taxRate": "0"
+      },
+      "dexRouterList": [
+        {
+          "dexProtocol": {
+            "dexName": "Elfomofi",
+            "percent": "100.00"
+          },
+          "fromToken": {
+            "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+            "tokenSymbol": "USDT",
+            "tokenUnitPrice": "0.999642699593911",
+            "decimal": "18",
+            "isHoneyPot": false,
+            "taxRate": "0"
+          },
+          "fromTokenIndex": "0",
+          "toToken": {
+            "tokenContractAddress": "0xca750ef65f295bbecd685abf54e82caf297bdb61",
+            "tokenSymbol": "SKHYB",
+            "tokenUnitPrice": "192.16000000000000000000000000",
+            "decimal": "18",
+            "isHoneyPot": false,
+            "taxRate": "0"
+          },
+          "toTokenIndex": "1"
+        },
+        {
+          "dexProtocol": {
+            "dexName": "Uniswap V4",
+            "percent": "100.00"
+          },
+          "fromToken": {
+            "tokenContractAddress": "0xca750ef65f295bbecd685abf54e82caf297bdb61",
+            "tokenSymbol": "SKHYB",
+            "tokenUnitPrice": "192.16000000000000000000000000",
+            "decimal": "18",
+            "isHoneyPot": false,
+            "taxRate": "0"
+          },
+          "fromTokenIndex": "1",
+          "toToken": {
+            "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+            "tokenSymbol": "NVDAB",
+            "tokenUnitPrice": "231.41995646059929070260000000",
+            "decimal": "18",
+            "isHoneyPot": false,
+            "taxRate": "0"
+          },
+          "toTokenIndex": "2"
+        }
+      ],
+      "approveTarget": "0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5",
+      "isBest": true,
+      "feeAmount": null,
+      "feeToken": null,
+      "actualSwapAmount": null
+    }
+  ],
+  "timestamp": 1790890524738,
+  "success": true
+}

@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root,
+[data-theme="light"] {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --border: #e5e5e5;
+  --text: #0a0a0a;
+  --muted: #6b6b6b;
+  --accent: #2563eb;
+  --good: #15803d;
+  --bad: #b91c1c;
+  --warn: #b45309;
+  --chip-good-bg: #dcfce7;
+  --chip-bad-bg: #fee2e2;
+  --chip-warn-bg: #fef3c7;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0b0b0c;
+  --surface: #141416;
+  --border: #26262a;
+  --text: #f2f2f3;
+  --muted: #9a9aa3;
+  --accent: #5b8def;
+  --good: #4ade80;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  --chip-good-bg: rgba(74, 222, 128, 0.14);
+  --chip-bad-bg: rgba(248, 113, 113, 0.14);
+  --chip-warn-bg: rgba(251, 191, 36, 0.14);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+input,
+button,
+select,
+summary {
+  font-family: inherit;
+}
+
+details > summary {
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}

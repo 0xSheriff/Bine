@@ -1,0 +1,14 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": [
+    {
+      "data": "0x095ea7b3000000000000000000000000b44446b0c8e56988c34f7ff73ae904982b5fdda50000000000000000000000000000000000000000000000001bc16d674ec80000",
+      "dexContractAddress": "0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5",
+      "gasLimit": "70000",
+      "gasPrice": "53537731"
+    }
+  ],
+  "timestamp": 1790891630278,
+  "success": true
+}

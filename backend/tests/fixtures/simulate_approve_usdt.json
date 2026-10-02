@@ -1,0 +1,20 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "status": "SUCCESS",
+    "failReason": "",
+    "balanceChanges": [],
+    "allowanceChanges": [
+      {
+        "tokenAddress": "0x55d398326f99059ff775485246999027b3197955",
+        "owner": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+        "spender": "0xb44446b0c8e56988c34f7ff73ae904982b5fdda5",
+        "preAmount": "0",
+        "postAmount": "2000000000000000000"
+      }
+    ]
+  },
+  "timestamp": 1790891648318,
+  "success": true
+}

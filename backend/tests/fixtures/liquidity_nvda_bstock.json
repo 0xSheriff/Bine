@@ -1,0 +1,353 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": [
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": null,
+      "protocolLogoUrl": null,
+      "liquidityUsd": null,
+      "poolAddress": "0xc41ca8bfa93505fdeefe40c8239f985ad43c6fa0",
+      "liquidityAmount": [
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": "Bebop",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_bebop.png",
+      "liquidityUsd": null,
+      "poolAddress": "0xdedb4fc0d625905e557c05429e3846a101deace8",
+      "liquidityAmount": [
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/NVDAon",
+      "protocolName": "Bebop",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_bebop.png",
+      "liquidityUsd": null,
+      "poolAddress": "0xe55ab195703e2219babcade372677565f011d22a",
+      "liquidityAmount": [
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "NVDAon",
+          "tokenName": "NVIDIA (Ondo Tokenized)",
+          "tokenContractAddress": "0xa9ee28c80f960b889dfbd1902055218cba016f75",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/4357ecbcd49d4dea9bca1072cb0da0f6.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": null,
+      "protocolLogoUrl": null,
+      "liquidityUsd": null,
+      "poolAddress": "0x0f3062dc4abd85f4524caf1ca3d0085b4b0ae4fc",
+      "liquidityAmount": [
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": "Native",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_native.png",
+      "liquidityUsd": null,
+      "poolAddress": "0x2501fc5943c424bdacb21890bf8b8485fe5581ba",
+      "liquidityAmount": [
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": null,
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": "PancakeSwap V3",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap3.png",
+      "liquidityUsd": "4917885.595139462516136225",
+      "poolAddress": "0x8fb4243b553ac29ba088acf00b9b7da24bd6690c",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "6623.08825921592575649",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "3389591.989869612418865264",
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": "Uniswap V3",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_uniswap3.png",
+      "liquidityUsd": "384018.582672316745963881",
+      "poolAddress": "0xdd9d5164ccbc57be377a964fc064135b03d06177",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "698.405755902283764067",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "222464.582502684439753123",
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": "PancakeSwap V3",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap3.png",
+      "liquidityUsd": "330601.543264962491057593",
+      "poolAddress": "0x18d52270d09ab842c87acd45977dcf64a82fa4ad",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "477.790538794849764806",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "221749.815087666324249116",
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/FNVDAB",
+      "protocolName": "PancakeSwap V3",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap3.png",
+      "liquidityUsd": "127291.118119207636015908",
+      "poolAddress": "0x0ac26b2484faaa3669e9bdf6a20371698006217e",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "428.178905140996853851",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "123.274654230025640508",
+          "tokenSymbol": "FNVDAB",
+          "tokenName": "Flap NVDAB Vault",
+          "tokenContractAddress": "0x23db0a080f3a59b09a5dd6570a373ee09f4dcf37",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/90361728569ECB373BFE9DA01395634C.jpg"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/JACKET",
+      "protocolName": "PancakeSwap",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap.png",
+      "liquidityUsd": "109342.06562043924299788",
+      "poolAddress": "0x5de5a5da39a23a023b964c25d1a836f9eea7cfd1",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "236.494592942685662707",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "87217753.985832347467437109",
+          "tokenSymbol": "JACKET",
+          "tokenName": "REAL WORLD APPAREL",
+          "tokenContractAddress": "0x57aedac0ccaafdec0ec62fc4fbfd8252735affff",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/75CBFEFB0F220F9CACBAF628843A5435.jpg"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/BI",
+      "protocolName": "PancakeSwap",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap.png",
+      "liquidityUsd": "106193.116457210669732777",
+      "poolAddress": "0xc4dc0a2a137fcc36af41edc0c5319ad4ac50f9a0",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "229.096212551991309202",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "57678348.037424312588755586",
+          "tokenSymbol": "BI",
+          "tokenName": "Binance Inu",
+          "tokenContractAddress": "0xcaf66eb2c00d206d741a654face34768cf2a7777",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/91EF4D02940D8A4830C6DDE1E6A1E0CF.webp"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/\u56db",
+      "protocolName": "PancakeSwap",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap.png",
+      "liquidityUsd": "93290.143916188682742407",
+      "poolAddress": "0x9e529156a304521b0607d5ce6bf459807f13625d",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "201.969456279628430565",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "78962710.099649118286862366",
+          "tokenSymbol": "\u56db",
+          "tokenName": "Super Inu",
+          "tokenContractAddress": "0x183ffbed812202a4dea1ef8a86b52f3b09f6ffff",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/4A2C1594C221F92209811DBF9F47726C.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/USDT",
+      "protocolName": "PancakeSwap V3",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap3.png",
+      "liquidityUsd": "47685.611910452969284909",
+      "poolAddress": "0xcc2bffaec373a6004bb6ccc8a62cdd66061f7c6a",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "65.696614872778597181",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "32508.135510047187256731",
+          "tokenSymbol": "USDT",
+          "tokenName": "Tether USD",
+          "tokenContractAddress": "0x55d398326f99059ff775485246999027b3197955",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/f8bbb8f921f54002ad7d28f8b4e199cd.png"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/BINF",
+      "protocolName": "PancakeSwap",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap.png",
+      "liquidityUsd": "46026.776962035262648581",
+      "poolAddress": "0x25ee4fa4bff5363d47496e68377b1241e8e21a47",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "98.805787216353512012",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "104465982.503276131513173821",
+          "tokenSymbol": "BINF",
+          "tokenName": "bInference",
+          "tokenContractAddress": "0x9862d6478cb8098645815ff27f91efbc659f7777",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/6D54A363CB0A82CFE2D9ED977260A5C4.webp"
+        }
+      ]
+    },
+    {
+      "pool": "NVDAB/WBNB",
+      "protocolName": "PancakeSwap V3",
+      "protocolLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/protocol/logos/bsc_pancakeswap3.png",
+      "liquidityUsd": "42737.231372574664329733",
+      "poolAddress": "0xdebed59510885e29ce1d3da0e5412d49d21f0354",
+      "liquidityAmount": [
+        {
+          "tokenAmount": "87.97667178319687258",
+          "tokenSymbol": "NVDAB",
+          "tokenName": "NVIDIA Corp",
+          "tokenContractAddress": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/9dc00cf6f4c44054b6be2d2e032b76c0.png"
+        },
+        {
+          "tokenAmount": "29.03621726005463766",
+          "tokenSymbol": "WBNB",
+          "tokenName": "Wrapped BNB",
+          "tokenContractAddress": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+          "tokenLogoUrl": "https://onchainos.bnbstatic.com/images/web3-data/public/token/logos/2C086DF443DC7FAA5E0C265A31505FF8.png"
+        }
+      ]
+    }
+  ],
+  "timestamp": 1790890525328,
+  "success": true
+}

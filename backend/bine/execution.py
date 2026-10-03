@@ -300,29 +300,51 @@ def _extract_tx_hash(parsed: dict[str, Any] | None) -> str | None:
     return None
 
 
-def run_agentic_wallet_swap(
-    winner: IssuerQuoteEvaluation,
-    amount_usd: float,
-    *,
-    poll_attempts: int = 10,
-    poll_interval_seconds: float = 2.0,
-) -> LiveExecutionResult:
-    """Invoke Binance Agentic Wallet CLI (`baw market-order swap`) for a capped live swap on BSC.
+def _resolve_baw_prefix() -> list[str] | None:
+    if shutil.which("baw"):
+        return ["baw"]
+    if shutil.which("npx"):
+        return ["npx", "--yes", "@binance/agentic-wallet@1.10.0"]
+    return None
 
-    Note on USDT approval:
-      Per `@binance/agentic-wallet` v1.10.0 (`dist/index.js` & `references/market-order.md`),
-      `baw market-order swap` submits to `/bapi/defi/v1/public/wallet-direct/web-dex/agent/place-order`
-      (or `/ondo/place-order` for Ondo RWA tokens), which handles token approval + order routing
-      inside the Agentic Wallet enclave and returns `{"success": true, "data": {"orderId": "..."}}`.
-      Per `references/market-order.md`, an `orderId` is not a completed swap until
-      `baw market-order list --orderId <orderId> --json` reaches terminal status `FINISHED` (with `txHash`)
-      or `FAILED`.
+
+def build_baw_swap_command_from_quote(
+    quote: dict[str, Any],
+    *,
+    expected_address: str | None = None,
+) -> tuple[list[str], str]:
+    """Build the `baw market-order swap` command directly from a `schema_version="1"` quote response dict.
+
+    Reads `quote["token"]["address"]` and `quote["amount_usd"]` from the quote response and
+    verifies character-by-character against `expected_address` when provided.
     """
-    baw_prefix = (
-        ["baw"]
-        if shutil.which("baw")
-        else (["npx", "--yes", "@binance/agentic-wallet@1.10.0"] if shutil.which("npx") else None)
-    )
+    if quote.get("verdict") != "BUY":
+        raise ValueError(f"Cannot build swap command for non-BUY quote (verdict={quote.get('verdict')!r}).")
+
+    token_obj = quote.get("token")
+    if not isinstance(token_obj, dict):
+        raise ValueError("Quote response is missing `token` object.")
+
+    to_address = str(token_obj.get("address") or "").strip()
+    if len(to_address) != 42 or not to_address.startswith("0x"):
+        raise ValueError(f"Invalid `token.address` in quote response: {to_address!r}")
+    try:
+        int(to_address[2:], 16)
+    except ValueError as exc:
+        raise ValueError(f"Non-hex `token.address` in quote response: {to_address!r}") from exc
+
+    if expected_address is not None:
+        exp_clean = expected_address.strip()
+        if to_address.lower() != exp_clean.lower():
+            raise ValueError(
+                f"Token address mismatch: quote.token.address={to_address!r} != expected={exp_clean!r}"
+            )
+
+    amount_usd = float(quote.get("amount_usd") or 0.0)
+    if amount_usd <= 0:
+        raise ValueError(f"Invalid `amount_usd` in quote response: {amount_usd!r}")
+
+    baw_prefix = _resolve_baw_prefix() or ["npx", "--yes", "@binance/agentic-wallet@1.10.0"]
     baw_args = [
         "market-order",
         "swap",
@@ -331,7 +353,7 @@ def run_agentic_wallet_swap(
         "--fromToken",
         USDT_BSC_ADDRESS,
         "--toToken",
-        winner.token_contract_address,
+        to_address,
         "--binanceChainId",
         "56",
         "--slippage",
@@ -342,9 +364,47 @@ def run_agentic_wallet_swap(
         "MEDIUM",
         "--json",
     ]
-    baw_cmd_list = (baw_prefix or ["npx", "--yes", "@binance/agentic-wallet@1.10.0"]) + baw_args
-    cmd_str = " ".join(baw_cmd_list)
+    cmd_list = baw_prefix + baw_args
+    return cmd_list, " ".join(cmd_list)
 
+
+def run_agentic_wallet_swap(
+    winner: IssuerQuoteEvaluation,
+    amount_usd: float,
+    *,
+    quote: dict[str, Any] | None = None,
+    poll_attempts: int = 25,
+    poll_interval_seconds: float = 2.0,
+) -> LiveExecutionResult:
+    """Invoke Binance Agentic Wallet CLI (`baw market-order swap`) for a capped live swap on BSC.
+
+    Always derives `--toToken` from `quote["token"]["address"]` (when `quote` is provided) and
+    verifies character-by-character that it matches `winner.token_contract_address`.
+    """
+    synthetic_quote = quote or {
+        "verdict": "BUY",
+        "amount_usd": amount_usd,
+        "token": {
+            "symbol": getattr(winner, "token_symbol", ""),
+            "address": winner.token_contract_address,
+            "issuer": getattr(winner, "platform_id", ""),
+        },
+    }
+    try:
+        baw_cmd_list, cmd_str = build_baw_swap_command_from_quote(
+            synthetic_quote,
+            expected_address=winner.token_contract_address,
+        )
+    except ValueError as exc:
+        return LiveExecutionResult(
+            attempted=False,
+            live_mode_enabled=True,
+            status="LIVE_ERROR",
+            baw_command="",
+            detail=f"Blocked before swap due to token address check: {exc}",
+        )
+
+    baw_prefix = _resolve_baw_prefix()
     if not baw_prefix:
         return LiveExecutionResult(
             attempted=True,
@@ -403,44 +463,82 @@ def run_agentic_wallet_swap(
             order_id = str(data_field["orderId"])
 
     # If `baw market-order swap` returned an `orderId` without an immediate `txHash`,
-    # poll `baw market-order list --orderId <orderId> --json` per `references/market-order.md`
+    # poll `baw market-order list --orderId <orderId> --json` per `references/market-order.md`.
+    # Note (empirical DevEx finding on `@binance/agentic-wallet` v1.10.0): when a swap requires an
+    # ERC-20 `approve` step before the `swap` step, `swap` returns the parent/approval `orderId`
+    # (e.g. `26100300001937918699`) while `market-order list` records the child swap order under a
+    # subsequent `orderId` (e.g. `26100300001937918737`). When `--orderId` returns `list: []`, we
+    # fall back to `baw market-order list --json` and match the child order for `toToken`.
+    target_to_lower = str((synthetic_quote.get("token") or {}).get("address") or "").strip().lower()
     finished = bool(tx_hash)
     if order_id and not tx_hash and poll_attempts > 0:
-        list_cmd = baw_prefix + ["market-order", "list", "--orderId", order_id, "--json"]
+        list_by_id_cmd = baw_prefix + ["market-order", "list", "--orderId", order_id, "--json"]
+        list_recent_cmd = baw_prefix + ["market-order", "list", "--json"]
         for _ in range(poll_attempts):
             time.sleep(poll_interval_seconds)
             try:
                 lproc = subprocess.run(
-                    list_cmd,
+                    list_by_id_cmd,
                     capture_output=True,
                     text=True,
                     timeout=20,
                     check=False,
                 )
+                items: list[Any] = []
                 if lproc.returncode == 0 and lproc.stdout:
                     lparsed = json.loads(lproc.stdout.strip())
                     ldata = lparsed.get("data") if isinstance(lparsed.get("data"), dict) else {}
-                    items = ldata.get("list") if isinstance(ldata, dict) else None
-                    if isinstance(items, list) and items and isinstance(items[0], dict):
-                        item = items[0]
-                        st = str(item.get("status") or "").upper()
-                        if item.get("txHash"):
-                            tx_hash = str(item["txHash"])
-                        if st == "FINISHED":
-                            finished = True
-                            parsed = {"submit": parsed, "order": item}
-                            break
-                        if st == "FAILED":
-                            return LiveExecutionResult(
-                                attempted=True,
-                                live_mode_enabled=True,
-                                status="LIVE_ERROR",
-                                order_id=order_id,
-                                tx_hash=tx_hash,
-                                baw_command=cmd_str,
-                                detail=f"`baw` market order {order_id} failed on-chain (status=FAILED).",
-                                raw_output={"submit": parsed, "order": item},
-                            )
+                    raw_items = ldata.get("list") if isinstance(ldata, dict) else None
+                    if isinstance(raw_items, list):
+                        items = raw_items
+
+                if not items:
+                    fproc = subprocess.run(
+                        list_recent_cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                        check=False,
+                    )
+                    if fproc.returncode == 0 and fproc.stdout:
+                        fparsed = json.loads(fproc.stdout.strip())
+                        fdata = fparsed.get("data") if isinstance(fparsed.get("data"), dict) else {}
+                        recent_list = fdata.get("list") if isinstance(fdata, dict) else None
+                        if isinstance(recent_list, list):
+                            for cand in recent_list:
+                                if not isinstance(cand, dict):
+                                    continue
+                                cand_to = str(cand.get("toToken") or "").strip().lower()
+                                cand_id = str(cand.get("orderId") or "").strip()
+                                if cand_to == target_to_lower and (
+                                    cand_id == order_id
+                                    or (cand_id.isdigit() and order_id.isdigit() and int(cand_id) >= int(order_id))
+                                ):
+                                    items = [cand]
+                                    break
+
+                if items and isinstance(items[0], dict):
+                    item = items[0]
+                    if item.get("orderId"):
+                        order_id = str(item["orderId"])
+                    st = str(item.get("status") or "").upper()
+                    if item.get("txHash"):
+                        tx_hash = str(item["txHash"])
+                    if st == "FINISHED":
+                        finished = True
+                        parsed = {"submit": parsed, "order": item}
+                        break
+                    if st == "FAILED":
+                        return LiveExecutionResult(
+                            attempted=True,
+                            live_mode_enabled=True,
+                            status="LIVE_ERROR",
+                            order_id=order_id,
+                            tx_hash=tx_hash,
+                            baw_command=cmd_str,
+                            detail=f"`baw` market order {order_id} failed on-chain (status=FAILED).",
+                            raw_output={"submit": parsed, "order": item},
+                        )
             except Exception:
                 pass
 
@@ -563,10 +661,10 @@ async def execute_trade_pipeline(
     )
 
     # 3. Determine execution outcome based on dry-run + admin token + live mode + hard USD caps
-    baw_preview_cmd = (
-        f"baw market-order swap --fromTokenQty {verdict_resp.amount_usd:g} "
-        f"--fromToken {USDT_BSC_ADDRESS} --toToken {winner.token_contract_address} "
-        f"--binanceChainId 56 --slippage 0.5 --mev true --gasLevel MEDIUM --json"
+    quote_dict = verdict_resp.to_dict(include_details=True)
+    _, baw_preview_cmd = build_baw_swap_command_from_quote(
+        quote_dict,
+        expected_address=winner.token_contract_address,
     )
 
     check_admin = require_admin_token or bool(settings.bine_admin_token)
@@ -641,6 +739,7 @@ async def execute_trade_pipeline(
                 run_agentic_wallet_swap,
                 winner,
                 verdict_resp.amount_usd,
+                quote=quote_dict,
             )
 
     # 4. Save audit record in `decision_log`

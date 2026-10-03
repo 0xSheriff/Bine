@@ -21,7 +21,7 @@ from bine.app import _resolve_ticker_samples
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
 from bine.config import Settings, get_settings
 from bine.database import AsyncSessionLocal, init_db
-from bine.execution import execute_trade_pipeline
+from bine.execution import build_baw_swap_command_from_quote, execute_trade_pipeline
 from bine.quote_engine import (
     DEFAULT_QUOTE_WALLET,
     build_verdict,
@@ -195,6 +195,9 @@ def _cmd_check(args: argparse.Namespace) -> int:
         print(json.dumps(result, indent=2))
     else:
         print(format_plain_check_line(result))
+        if getattr(args, "baw", False) and result.get("verdict") == "BUY":
+            _, cmd_str = build_baw_swap_command_from_quote(result)
+            print(f"baw_command: {cmd_str}")
     return 0 if result.get("verdict") == "BUY" else 2
 
 
@@ -213,6 +216,9 @@ def _cmd_buy(args: argparse.Namespace) -> int:
     exec_obj = dry_result.get("execution") or {}
     sim_summary = sim.get("summary") or exec_obj.get("detail") or "Dry-run complete."
     print(f"Dry-run: {sim_summary}")
+    if quote.get("verdict") == "BUY":
+        _, cmd_str = build_baw_swap_command_from_quote(quote)
+        print(f"baw_command: {cmd_str}")
 
     if not sim.get("passed"):
         return 2
@@ -253,6 +259,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument("ticker", type=str, help="Underlying stock ticker (e.g. NVDA, AAPL, SPY)")
     p_check.add_argument("amount_usd", type=float, nargs="?", default=5.50, help="USD order amount (default: 5.50)")
     p_check.add_argument("--json", action="store_true", help="Print the frozen schema_version=1 JSON")
+    p_check.add_argument("--baw", action="store_true", help="Print the baw swap command built from quote.token.address")
     p_check.set_defaults(func=_cmd_check)
 
     p_buy = sub.add_parser("buy", help="Run pre-trade check + dry-run simulation, then prompt for live swap")

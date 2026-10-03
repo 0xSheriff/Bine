@@ -174,3 +174,20 @@ All entries are factual. Timestamps are UTC.
 - **Plug-in Surfaces (`bine` CLI, MCP Server, `SKILL.md`)**:
   - Verified `bine check NVDA 25`, `bine check NVDA 25 --json`, and stdio JSON-RPC `2.0` calls (`tools/list`, `tools/call` for `bine_check` and `bine_buy`) against the frozen `schema_version: "1"` contract (`48/48` pytest tests passing).
 
+## 2026-10-03T21:18Z — Live `$2.00` `NVDAB` Swap Verification (`0x00c0fabd...e506`) & `orderId` Parent/Child Discovery
+
+- **1. Dynamic `--toToken` Generator from Quote Response (`build_baw_swap_command_from_quote`)**:
+  - Replaced hardcoded/manual CLI command construction with `build_baw_swap_command_from_quote(quote, expected_address=...)` in `backend/bine/execution.py` and `bine check --baw` / `bine buy` in `backend/bine/cli.py`.
+  - Verified character-by-character that `quote["token"]["address"]` for `NVDAB` equals `0x02fca66c1d1afb4e2a7884261eb00f63598a7436`.
+- **2. Pre-Swap Wallet Balance & Transaction API Dry-Run (`docs/dry_run_nvda_2usd.json`)**:
+  - `baw wallet balance --binanceChainId 56 --json` on wallet `0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730`: `5.00 USDT` (`$4.9996`) and `0.00025936 BNB` (`$0.2041`).
+  - Transaction API `/api/v1/dex/pre-transaction/simulate` dry-run passed (`REQUIRES_APPROVAL`, with `/approve-transaction` simulation returning `SUCCESS` for `2000000000000000000` wei on `0x55d398326f99059fF775485246999027B3197955`).
+- **3. Live Swap Execution & Parent/Child `orderId` Discovery (`docs/live_swap_nvda_2usd.json`)**:
+  - Executed `npx --yes @binance/agentic-wallet@1.10.0 market-order swap --fromTokenQty 2 --fromToken 0x55d398326f99059fF775485246999027B3197955 --toToken 0x02fca66c1d1afb4e2a7884261eb00f63598a7436 --binanceChainId 56 --slippage 0.5 --mev true --gasLevel MEDIUM --json`.
+  - `swap` returned `{"success": true, "data": {"orderId": "26100300001937918699"}}`. Because the wallet executed an on-chain `approve` (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`) followed by the `swap` (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`), `market-order list --orderId 26100300001937918699 --json` returned `list: []` while `market-order list --json` recorded the settled market order under child `orderId: "26100300001937918737"` (`status: "FINISHED"`, `txHash: "0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506"`). Updated `run_agentic_wallet_swap()` to fall back to `market-order list --json` when `--orderId` returns an empty list.
+- **4. Quoted vs. Filled Shares & Gas Cost**:
+  - **Quoted (`2026-10-03T21:18:06Z`, `offhours`)**: `0.008512` shares (`0.00851212` unrounded; `0.00850550` `NVDAB` tokens * `1.0007782237528078` `tokenToShareRatio`), all-in `$237.06/share` vs `$235.07` reference (`+0.85%` off-hours spread; earlier off-hours sample was `0.008516` shares at `+0.99%`).
+  - **Filled on-chain at `0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730`**:
+    - On-chain ERC-20 `balanceOf`: `8505393792444895` wei = **`0.008505393792444894` `NVDAB` tokens** (`-0.12 bps` vs quoted `0.00850550` tokens).
+    - Share-equivalent balance (`toTokenActualQty` in `baw`): **`0.00851201289192116` shares** (`-0.13 bps` vs immediate quote `0.00851212`, `-4.7 bps` vs earlier `0.008516` quote).
+    - Total BNB gas spent: `0.000002932518144096 BNB` (approve) + `0.000047976548789549 BNB` (swap) = **`0.000050909066933645 BNB` (`$0.040`)**.

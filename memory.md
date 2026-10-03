@@ -85,7 +85,12 @@
   - Re-captured all 24 screenshots (`BUY NVDA $5.50`, `REFUSE AAPL $2`, `REFUSE SPYon $250`, and `Confirm` dry-run panel at `390px`, `768px`, and `1440px` in Light and Dark themes) on the current 4-route build (`dist/assets/index-B71wR5wL.js`).
   - Opened and inspected all 24 PNGs via `view_file`: confirmed `ui_confirm_light_1440.png` and all 5 other `ui_confirm_*` screenshots render the expanded `SIMULATION PASSED` panel (`Decision #9–#14`), all `768px` and `1440px` screenshots render the updated `Details` bar (`2 issuers · market offhours` / `1 issuer · market offhours`), and all 24 screenshots show the 4-route header (`Bine | Guard Integrate Refusals Receipts`) and `$5.50` default with zero defects.
 - **2026-10-03 (Item D — 12-Category Re-Score)**:
-  - Completed the 12-category evaluation (`minimalism`, `real-world usefulness`, `immediate usability`, `plug and play`, `technical execution`, `originality`, `UX`, `visual quality`, `demonstration potential`, `hackathon differentiation`, `clarity`, `technical story`) with concrete file, test, command, and screenshot evidence (`Overall: 9.0/10`, with live on-chain swap explicitly noted as `UNVERIFIED` pending user wallet execution).
+  - Completed the 12-category evaluation (`minimalism`, `real-world usefulness`, `immediate usability`, `plug and play`, `technical execution`, `originality`, `UX`, `visual quality`, `demonstration potential`, `hackathon differentiation`, `clarity`, `technical story`) with concrete file, test, command, and screenshot evidence (`Overall: 9.0/10` before live swap, `9.5/10` after live `$2 NVDAB` swap verification).
+- **2026-10-03 (Live `$2.00` `NVDAB` Swap Verification & Dynamic `--toToken` Generator Fix)**:
+  - Added `build_baw_swap_command_from_quote(quote, expected_address=...)` in `backend/bine/execution.py` and wired it into `execute_trade_pipeline()`, `run_agentic_wallet_swap()`, and `backend/bine/cli.py` (`bine check --baw` and `bine buy`) so `--toToken` is always read directly from `quote["token"]["address"]` (`0x02fca66c1d1afb4e2a7884261eb00f63598a7436` for `NVDAB`) and verified character-by-character before any swap.
+  - Verified Agentic Wallet (`0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730` on BSC `56`) balance (`5.00 USDT`, `0.00025936 BNB`), ran and saved the Transaction API dry-run (`docs/dry_run_nvda_2usd.json`), and executed the `$2.00` `NVDAB` live swap (`docs/live_swap_nvda_2usd.json`, `Decision #16`).
+  - Confirmed on-chain (`txHash: 0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`, approve `txHash: 0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`, total gas `0.00005091 BNB` $\approx \$0.040$): `0.00851201289192116` `NVDAB` shares (`8505393792444895` wei = `0.008505393792444894` raw `NVDAB` tokens * `1.0007782237528078` `tokenToShareRatio`) landed at `0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730` (`-0.13 bps` vs immediate `0.00851212` quote, `-4.7 bps` vs earlier `0.008516` quote).
+  - Discovered and fixed parent-vs-child `orderId` split on `approve` + `swap` in `run_agentic_wallet_swap()` (`swap` returned parent `orderId: 26100300001937918699` while `market-order list` recorded child `orderId: 26100300001937918737`).
 
 ## 6. Important Decisions
 - **5 bps Tie Band (`"Either works"`)**: When both issuers are eligible and within 5 bps on all-in price per share, Bine does not claim a price winner; it says `"Either works"` and picks deterministically (deeper AMM liquidity first → lower minimum order → alphabetical).
@@ -98,10 +103,10 @@
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed Items A (1–6), B, C, and D; awaiting user execution of the optional live `$2` `NVDAB` swap command.
+- Completed all items including the live `$2.00` `NVDAB` swap (`txHash: 0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`) and on-chain verification.
 
 ## 9. Next Steps
-1. User can optionally authenticate `baw` (`npx --yes @binance/agentic-wallet@1.10.0 auth signin`), fund the BSC wallet (`~0.001 BNB` + `$2 USDT`), and run the prepared `$2` `NVDAB` command to record a live on-chain `txHash`.
+1. Ready for final submission or deployment (`docs/deploy.md`).
 
 ## 10. Important Files
 - `memory.md` — Primary AI context and handoff state.
@@ -110,6 +115,8 @@
 - `docs/friction-log.md` — Empirical friction log with raw API measurements.
 - `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
 - `docs/deploy.md` — Single-service deployment guide (Phase 2).
+- `docs/dry_run_nvda_2usd.json` — Saved Transaction API dry-run output before live swap.
+- `docs/live_swap_nvda_2usd.json` — Saved `$2.00` `NVDAB` live swap receipt (`Decision #16`).
 - `tools/collect_evidence.py` — Standalone evidence sampler utility.
 - `backend/bine/client.py` — `BinanceClient` + `maybe_enable_dev_dns_fallback`.
 - `backend/bine/quality.py` — Data-quality filter (`assess_token_quality`, `MAX_SHARE_RATIO = 5.0`).

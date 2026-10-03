@@ -241,7 +241,19 @@ def test_refusal_rule_below_issuer_minimum(
     )
     assert ev.eligible is False
     assert ev.refusal_code == "below_issuer_minimum"
-    assert "$5.00 minimum order" in (ev.refusal_reason or "")
+    assert ev.refusal_reason == "Ondo's minimum order is $5 (you entered $2.00). Try $5.50."
+
+    ev5 = evaluate_issuer_quote(
+        sample=ondo_sample,
+        amount_usd=5.0,
+        quote_response=None,
+        liquidity_response=nvda_ondo_liq_fixture,
+        quote_error="[40375] Minimum order amount is 5 USD.",
+        now=now,
+    )
+    assert ev5.eligible is False
+    assert ev5.refusal_code == "below_issuer_minimum"
+    assert ev5.refusal_reason == "Ondo's minimum order is $5. After conversion your $5.00 lands just under it. Try $5.50."
 
     verdict = build_verdict("AAPL", 2.0, [ev], now=now)
     d = verdict.to_dict()

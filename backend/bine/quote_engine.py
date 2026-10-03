@@ -400,8 +400,12 @@ def evaluate_issuer_quote(
             qual_msg = f"{sample.token_symbol} trades at ${sample.token_price:.4f} (under the $1.00 minimum price filter). Data is unreliable — not buying."
         elif sample.reference_price is not None and sample.reference_price < 1.00:
             qual_msg = f"{sample.token_symbol} has a reference price of ${sample.reference_price:.4f} (under the $1.00 minimum). Data is unreliable — not buying."
-        elif sample.token_to_share_ratio is not None and (sample.token_to_share_ratio < 0.25 or sample.token_to_share_ratio > 20.0):
-            qual_msg = f"{sample.token_symbol} has an extreme share ratio ({sample.token_to_share_ratio:.4f} shares per token). Data is unreliable — not buying."
+        elif sample.token_to_share_ratio is not None and (sample.token_to_share_ratio < 0.25 or sample.token_to_share_ratio > 5.0):
+            qual_msg = (
+                f"{sample.token_symbol} has an extreme share ratio ({sample.token_to_share_ratio:.4f} shares per token: "
+                f"token price ${(sample.token_price or 0):,.2f} vs ${(sample.reference_price or 0):,.2f} reference). "
+                f"Data is unreliable — not buying."
+            )
         elif sample.volume_24h is None or sample.volume_24h < 1_000_000:
             qual_msg = f"{sample.token_symbol} has only ${(sample.volume_24h or 0):,.0f} in 24-hour volume (under the $1M minimum). Too illiquid — not buying."
         else:
@@ -440,9 +444,9 @@ def evaluate_issuer_quote(
     below_min = _is_below_issuer_minimum_error(ev.quote_error, sample.platform_id, amount_usd)
     if below_min:
         if amount_usd < 5.0:
-            min_msg = f"{short_issuer} requires a $5.00 minimum order, and you entered ${amount_usd:,.2f}. Not buying on {short_issuer}."
+            min_msg = f"{short_issuer}'s minimum order is $5 (you entered ${amount_usd:,.2f}). Try $5.50."
         else:
-            min_msg = f"{short_issuer} requires strictly over $5.00 USD after USDT peg conversion (${amount_usd:,.2f} USDT triggered [40375] minimum order check; use $5.05+ for Ondo). Not buying on {short_issuer}."
+            min_msg = f"{short_issuer}'s minimum order is $5. After conversion your ${amount_usd:,.2f} lands just under it. Try $5.50."
     else:
         min_msg = f"Order size ${amount_usd:,.2f} meets {short_issuer} minimum."
     checks.append(RefusalCheck(rule="below_issuer_minimum", triggered=below_min, detail=min_msg))

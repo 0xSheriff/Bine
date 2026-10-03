@@ -37,10 +37,13 @@ Raw chronological list of verified technical observations, endpoints, timestamps
    - **UTC Timestamp**: `2026-09-30T20:02:51Z` (4:02 PM ET, 2 minutes after US regular session close)
    - **Observation**: All `ondo` tokens returned `statusInfo: {"openState": false, "marketStatus": "paused", "reasonCode": "MARKET_PAUSED", "reasonMsg": "", "nextOpenTime": 1790884980000}` for the 3-minute transition window (`20:00–20:03 UTC`) before switching to `"postmarket"` with `openState: true` at `20:03:00 UTC`.
 
-7. **Ondo `$5.00` Minimum Order Business Error (`[40375]`)**
-   - **Endpoint**: `GET /build/api/v1/dex/aggregator/quote?binanceChainId=56&fromTokenAddress=0x55d398326f99059ff775485246999027b3197955&toTokenAddress=0xa9998e732f483032e3d9702f25e2102c92f907a7&amount=2000000000000000000`
-   - **UTC Timestamp**: `2026-10-01T15:30:12Z`
-   - **Observation**: Requesting a `$2.00` quote (`amount=2000000000000000000`) on any Ondo token (`NVDAon`, `AAPLon`, `SPYon`) returns HTTP `200` with JSON body `{"code": 40375, "msg": "Minimum order amount is 5 USD."}`. Dinari `bstock` tokens (`NVDAB`, `SPYB`, `TSLAB`) accept `$2.00` orders without a `$5.00` floor.
+7. **Ondo `$5.00` Minimum Order Business Error (`[40375]`) & `$5.00` Boundary Check**
+   - **Endpoint**: `GET /build/api/v1/dex/aggregator/quote?binanceChainId=56&fromTokenAddress=0x55d398326f99059ff775485246999027b3197955&toTokenAddress=0xa9ee28c80f960b889dfbd1902055218cba016f75&amount=5000000000000000000&userWalletAddress=0x5B38Da6a701c568545dCfcB03FcB875f56beddC4`
+   - **UTC Timestamp**: `2026-10-02T23:57:05Z`
+   - **Observation**:
+     - Requesting `$2.00` (`2e18`) or `$5.00` (`5000000000000000000`) on `NVDAon` returns `{"code": 40375, "msg": "Minimum order amount is 5 USD.", "data": null}`.
+     - Requesting `$5.05` (`5050000000000000000`) immediately after succeeds (`code: 0`) and returns `fromToken.tokenUnitPrice: "0.9998174209196552"` and `tradeFee: "0.02024673"`.
+     - **Peg / Fee Hypothesis Status — UNVERIFIED**: While `5.00 * 0.9998174209196552 = 4.999087` and `5.00 - 0.02024673 = 4.97975` both fall under `5.00`, the `[40375]` error response body has `data: null` and contains no field proving which internal formula triggered the rejection. Therefore the exact internal cause is marked **UNVERIFIED**, and Bine uses `$5.50` as the default order size with plain-English copy (`"Ondo's minimum order is $5. After conversion your $5.00 lands just under it. Try $5.50."`).
 
 8. **`GET /build/api/v1/dex/market/token/top-liquidity` Null `liquidityUsd` on Ondo PMM Pools**
    - **Endpoint**: `GET /build/api/v1/dex/market/token/top-liquidity?binanceChainId=56&tokenContractAddress=0xa9998e732f483032e3d9702f25e2102c92f907a7`

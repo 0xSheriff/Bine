@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     binance_api_key: str = ""
     binance_secret_key: str = ""
 
-    # Agent execution — off by default, tiny caps ($6 max so Ondo's $5 minimum works)
+    # Hosted read-only Bine API fallback when no local Binance keys are configured
+    bine_api_url: str = "https://bine-guard.fly.dev"
+
+    # Agent execution — off by default, tiny caps ($6 max so Ondo's $5.50 default works)
     bine_live_mode: bool = False
     bine_max_trade_usd: float = 6.00
     bine_daily_cap_usd: float = 10.00
@@ -25,9 +28,6 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:8000,http://127.0.0.1:8000"
     )
-
-    # Optional evidence collector interval (minutes)
-    bine_sample_interval_minutes: int = 5
 
     # Local dev DNS fallback (off in production by default)
     dev_dns_fallback: bool = False

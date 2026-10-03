@@ -318,8 +318,12 @@ def run_agentic_wallet_swap(
       `baw market-order list --orderId <orderId> --json` reaches terminal status `FINISHED` (with `txHash`)
       or `FAILED`.
     """
-    baw_cmd_list = [
-        "baw",
+    baw_prefix = (
+        ["baw"]
+        if shutil.which("baw")
+        else (["npx", "--yes", "@binance/agentic-wallet@1.10.0"] if shutil.which("npx") else None)
+    )
+    baw_args = [
         "market-order",
         "swap",
         "--fromTokenQty",
@@ -338,19 +342,19 @@ def run_agentic_wallet_swap(
         "MEDIUM",
         "--json",
     ]
+    baw_cmd_list = (baw_prefix or ["npx", "--yes", "@binance/agentic-wallet@1.10.0"]) + baw_args
     cmd_str = " ".join(baw_cmd_list)
 
-    baw_bin = shutil.which("baw")
-    if not baw_bin:
+    if not baw_prefix:
         return LiveExecutionResult(
             attempted=True,
             live_mode_enabled=True,
             status="LIVE_ERROR",
             baw_command=cmd_str,
             detail=(
-                "Binance Agentic Wallet CLI (`baw`) is not installed or not in PATH. "
-                "Install `@binance/agentic-wallet` (`npm install -g @binance/agentic-wallet`) "
-                "and sign in (`baw auth signin`) before live execution."
+                "Neither `baw` nor `npx` was found on PATH. "
+                "Install `@binance/agentic-wallet@1.10.0` (`npm install -g @binance/agentic-wallet@1.10.0`) "
+                "and sign in (`npx --yes @binance/agentic-wallet@1.10.0 auth signin`) before live execution."
             ),
         )
 
@@ -402,7 +406,7 @@ def run_agentic_wallet_swap(
     # poll `baw market-order list --orderId <orderId> --json` per `references/market-order.md`
     finished = bool(tx_hash)
     if order_id and not tx_hash and poll_attempts > 0:
-        list_cmd = ["baw", "market-order", "list", "--orderId", order_id, "--json"]
+        list_cmd = baw_prefix + ["market-order", "list", "--orderId", order_id, "--json"]
         for _ in range(poll_attempts):
             time.sleep(poll_interval_seconds)
             try:

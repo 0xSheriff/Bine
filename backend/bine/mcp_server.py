@@ -40,10 +40,11 @@ TOOLS = [
                 },
                 "amount_usd": {
                     "type": "number",
-                    "description": "Order size in USD (e.g. 5, 25).",
+                    "default": 5.50,
+                    "description": "Order size in USD (default: 5.50; e.g. 5.50, 25).",
                 },
             },
-            "required": ["ticker", "amount_usd"],
+            "required": ["ticker"],
         },
     },
     {
@@ -62,7 +63,8 @@ TOOLS = [
                 },
                 "amount_usd": {
                     "type": "number",
-                    "description": "Order size in USD (must be <= BINE_MAX_TRADE_USD).",
+                    "default": 5.50,
+                    "description": "Order size in USD (default: 5.50; must be <= BINE_MAX_TRADE_USD).",
                 },
                 "confirm": {
                     "type": "boolean",
@@ -70,7 +72,7 @@ TOOLS = [
                     "description": "False (default) runs dry-run only; True requests live execution if BINE_LIVE_MODE=true.",
                 },
             },
-            "required": ["ticker", "amount_usd"],
+            "required": ["ticker"],
         },
     },
 ]
@@ -80,7 +82,7 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """Dispatch a tool call and return an MCP CallToolResult payload."""
     if name == "bine_check":
         ticker = str(arguments.get("ticker", "")).strip().upper()
-        amount_usd = float(arguments.get("amount_usd", 0.0))
+        amount_usd = float(arguments.get("amount_usd", 5.50))
         verdict = await run_check(ticker, amount_usd, include_details=False)
         summary = format_plain_check_line(verdict)
         return {
@@ -94,7 +96,7 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
     if name == "bine_buy":
         ticker = str(arguments.get("ticker", "")).strip().upper()
-        amount_usd = float(arguments.get("amount_usd", 0.0))
+        amount_usd = float(arguments.get("amount_usd", 5.50))
         confirm = bool(arguments.get("confirm", False))
         result = await run_buy_step(ticker, amount_usd, execute_live=confirm)
         exec_obj = result.get("execution") or {}

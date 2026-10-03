@@ -1,9 +1,9 @@
 """Bine CLI — Pre-trade guard for tokenized stocks on BSC (`chainId="56"`).
 
 Usage:
-    bine check NVDA 25          # One plain-English line (BUY or REFUSE + reason)
-    bine check NVDA 25 --json   # Raw frozen schema_version="1" JSON
-    bine buy NVDA 5             # Check + dry-run + y/N prompt + live swap (if BINE_LIVE_MODE=true)
+    bine check NVDA 5.50        # One plain-English line (BUY or REFUSE + reason)
+    bine check NVDA 5.50 --json # Raw frozen schema_version="1" JSON
+    bine buy NVDA 5.50          # Check + dry-run + y/N prompt + live swap (if BINE_LIVE_MODE=true)
 """
 
 from __future__ import annotations
@@ -11,8 +11,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from typing import Any
+
+import httpx
 
 from bine.app import _resolve_ticker_samples
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
@@ -24,6 +27,13 @@ from bine.quote_engine import (
     build_verdict,
     fetch_live_issuer_quote_and_liquidity,
 )
+
+
+def _should_use_hosted_api(cfg: Settings) -> bool:
+    """Use hosted BINE_API_URL when no local Binance keys are set, or when BINE_API_URL is explicitly set in env."""
+    if os.environ.get("BINE_API_URL"):
+        return True
+    return not bool(cfg.binance_api_key.strip() and cfg.binance_secret_key.strip())
 
 
 def format_plain_check_line(result: dict[str, Any]) -> str:
@@ -57,15 +67,26 @@ def format_plain_check_line(result: dict[str, Any]) -> str:
 
 async def run_check(
     ticker: str,
-    amount_usd: float,
+    amount_usd: float = 5.50,
     *,
     settings: Settings | None = None,
     include_details: bool = False,
 ) -> dict[str, Any]:
-    """Run the live pre-trade quote check against Binance Web3 Open APIs."""
+    """Run the pre-trade quote check (direct mode when keys exist, hosted BINE_API_URL otherwise)."""
     cfg = settings or get_settings()
-    maybe_enable_dev_dns_fallback(cfg.dev_dns_fallback)
     ticker_upper = ticker.strip().upper()
+
+    if settings is None and _should_use_hosted_api(cfg):
+        base = cfg.bine_api_url.rstrip("/")
+        params: dict[str, Any] = {"ticker": ticker_upper, "amount_usd": amount_usd}
+        if include_details:
+            params["details"] = "true"
+        async with httpx.AsyncClient(timeout=15.0) as hc:
+            resp = await hc.get(f"{base}/api/quote", params=params)
+            resp.raise_for_status()
+            return dict(resp.json())
+
+    maybe_enable_dev_dns_fallback(cfg.dev_dns_fallback)
     wallet = cfg.bine_wallet_address or DEFAULT_QUOTE_WALLET
 
     async with BinanceClient(
@@ -102,16 +123,27 @@ async def run_check(
 
 async def run_buy_step(
     ticker: str,
-    amount_usd: float,
+    amount_usd: float = 5.50,
     *,
     execute_live: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Run check + dry-run (or live swap when execute_live=True) and persist to decision_log."""
     cfg = settings or get_settings()
+    ticker_upper = ticker.strip().upper()
+
+    if settings is None and not execute_live and _should_use_hosted_api(cfg):
+        base = cfg.bine_api_url.rstrip("/")
+        async with httpx.AsyncClient(timeout=20.0) as hc:
+            resp = await hc.post(
+                f"{base}/api/execute",
+                json={"ticker": ticker_upper, "amount_usd": amount_usd, "execute_live": False},
+            )
+            resp.raise_for_status()
+            return dict(resp.json())
+
     maybe_enable_dev_dns_fallback(cfg.dev_dns_fallback)
     await init_db()
-    ticker_upper = ticker.strip().upper()
     wallet = cfg.bine_wallet_address or DEFAULT_QUOTE_WALLET
 
     async with BinanceClient(
@@ -213,19 +245,19 @@ def _cmd_buy(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bine",
-        description="Bine — Pre-trade guard for tokenized stocks on BSC.",
+        description="Bine — Pre-trade guard for tokenized stocks on BSC (uses hosted BINE_API_URL when no Binance keys are set).",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_check = sub.add_parser("check", help="Check whether a tokenized stock is safe to buy right now")
     p_check.add_argument("ticker", type=str, help="Underlying stock ticker (e.g. NVDA, AAPL, SPY)")
-    p_check.add_argument("amount_usd", type=float, help="USD order amount (e.g. 25)")
+    p_check.add_argument("amount_usd", type=float, nargs="?", default=5.50, help="USD order amount (default: 5.50)")
     p_check.add_argument("--json", action="store_true", help="Print the frozen schema_version=1 JSON")
     p_check.set_defaults(func=_cmd_check)
 
     p_buy = sub.add_parser("buy", help="Run pre-trade check + dry-run simulation, then prompt for live swap")
     p_buy.add_argument("ticker", type=str, help="Underlying stock ticker (e.g. NVDA)")
-    p_buy.add_argument("amount_usd", type=float, help="USD order amount (e.g. 5)")
+    p_buy.add_argument("amount_usd", type=float, nargs="?", default=5.50, help="USD order amount (default: 5.50)")
     p_buy.add_argument("-y", "--yes", action="store_true", help="Skip interactive confirmation prompt")
     p_buy.set_defaults(func=_cmd_buy)
 

@@ -22,7 +22,7 @@ MIN_TOKEN_PRICE_USD = 1.00
 MIN_REFERENCE_PRICE_USD = 1.00
 MIN_VOLUME_24H_USD = 1_000_000.0  # $1M 24h underlying/token volume
 MIN_SHARE_RATIO = 0.25
-MAX_SHARE_RATIO = 20.0
+MAX_SHARE_RATIO = 5.0
 
 # Canonical 40 tickers confirmed on both Ondo and bStocks on BSC (chainId=56)
 DUAL_ISSUER_TICKERS: tuple[str, ...] = (

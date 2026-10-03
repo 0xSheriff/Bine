@@ -41,12 +41,12 @@ Never bypass a `REFUSE` verdict. Bine refuses trades when:
 
 ## Workflow for Agentic Wallet (`baw`) Swaps
 
-1. **Run the pre-trade guard first**:
+1. **Run the pre-trade guard first** (works with zero Binance keys via hosted `BINE_API_URL`, or direct mode when keys are present):
    ```bash
-   bine check NVDA 5 --json
+   bine check NVDA 5.50 --json
    ```
 2. **Inspect `verdict`**:
    - If `"verdict": "REFUSE"`, **STOP IMMEDIATELY**. Report `refusal.code` and `refusal.message` to the user. Do not call `baw market-order swap`.
    - If `"verdict": "BUY"`, read the winning `token.address`, `token.symbol`, `token.issuer`, `shares`, and `all_in_price_per_share`.
 3. **Execute or dry-run**:
-   - Prefer `bine buy <TICKER> <AMOUNT_USD>`, which runs `/api/v1/dex/pre-transaction/simulate` first and only invokes `baw market-order swap --binanceChainId 56 --fromToken 0x55d398326f99059ff775485246999027b3197955 --toToken <token.address> --fromTokenQty <AMOUNT_USD> --json` after simulation passes and live mode is enabled.
+   - Prefer `bine buy <TICKER> 5.50`, which runs `/api/v1/dex/pre-transaction/simulate` first and only invokes `npx --yes @binance/agentic-wallet@1.10.0 market-order swap --fromTokenQty <AMOUNT_USD> --fromToken 0x55d398326f99059fF775485246999027B3197955 --toToken <token.address> --binanceChainId 56 --slippage 0.5 --mev true --gasLevel MEDIUM --json` after simulation passes and live mode is enabled.

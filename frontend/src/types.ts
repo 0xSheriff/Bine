@@ -89,6 +89,19 @@ export interface TickerItem {
 export interface TickerListResponse {
   count: number
   tickers: TickerItem[]
+  catalog_examples?: {
+    share_ratio: {
+      ticker: string
+      symbol: string
+      token_to_share_ratio: number
+    }
+    session_closed: {
+      ticker: string
+      symbol: string
+      market_status: string
+      reason_code: string
+    }
+  }
 }
 
 export interface HealthResponse {

@@ -63,6 +63,29 @@
   - Measured cold-load latency (`/rwa/tokens` cache cold + 2 live `/aggregator/quote` + 2 `/top-liquidity` calls) at `3.244s`, warm-catalog live quote latency at `0.931s–1.306s`, and warm 15s quote-cache latency at `1.2ms`.
 - **2026-10-02 (Item 8 — Final Judge Test Re-Score)**:
   - Re-scored all 12 categories with concrete file/test/screenshot/command evidence (`11/12` categories passing at `9/10–10/10`; `Live On-Chain Execution` explicitly marked `0/10 (UNVERIFIED)` until the user runs the live `$2`/`$5` swap commands).
+- **2026-10-03 (Item A.1 — Standalone Git Repo & Staged Secret Scan)**:
+  - Ran `git rev-parse --show-toplevel` (which previously returned `/Users/mac`), initialized a dedicated git repository inside `/Users/mac/Bine` (`git init`), confirmed `git check-ignore -v .env` -> `.gitignore:1:.env	.env`, scanned all staged files for `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` (`staged_key_matches=0`, `staged_secret_matches=0`), and created root commit `1a6e1d1`.
+- **2026-10-03 (Item A.2 — `baw` Command Flags & `npx` Fallback)**:
+  - Verified `npx --yes @binance/agentic-wallet@1.10.0 market-order swap --help`: uses `--fromTokenQty`, `--fromToken`, `--toToken`, `--binanceChainId 56`, `--slippage` (`"auto"` or `0–100` percentage points, e.g. `0.5` = `0.5%`), `--mev true`, `--gasLevel MEDIUM`, `--json`.
+  - Updated `run_agentic_wallet_swap()` in `backend/bine/execution.py` to fall back to `npx --yes @binance/agentic-wallet@1.10.0` when `baw` is not installed globally on `PATH`.
+- **2026-10-03 (Item A.3 — `$5.50` Default Amount & Plain-English Minimum Copy)**:
+  - Set default order amount to `$5.50` across UI, CLI help, MCP descriptions, `app.py`, `SKILL.md`, and `README.md`.
+  - Updated `below_issuer_minimum` message in `backend/bine/quote_engine.py` to `"Ondo's minimum order is $5. After conversion your $5.00 lands just under it. Try $5.50."` and documented the `5.00` vs `5.05` `[40375]` test in `docs/devex-facts.md` (`UNVERIFIED` internal cause since `data` is `null` on `40375`).
+- **2026-10-03 (Item A.4 — Hosted Read-Only `BINE_API_URL` Default for CLI & MCP)**:
+  - Updated `backend/bine/config.py` (`bine_api_url`) and `backend/bine/cli.py` (`_should_use_hosted_api`) so `bine` and `bine-mcp` automatically query `BINE_API_URL` when no local Binance keys are set (or when `BINE_API_URL` is set in env), while preserving direct mode when keys are present.
+- **2026-10-03 (Item A.5 — Remove `apscheduler` and `test_sampler.py`)**:
+  - Removed `apscheduler>=3.10` from `backend/pyproject.toml`, removed `bine_sample_interval_minutes` from `backend/bine/config.py`, deleted `backend/tests/test_sampler.py`, and updated `tools/collect_evidence.py` to use a plain `asyncio.sleep` loop with zero `apscheduler` dependency.
+- **2026-10-03 (Item B — Four Routes `/`, `/integrate`, `/refusals`, `/receipts` & SPA Fallback)**:
+  - Updated `TopHeader` in `frontend/src/components/shared.tsx` with wordmark, 4-route nav (`Guard`, `Integrate`, `Refusals`, `Receipts`), and theme toggle.
+  - Added `frontend/src/pages/Integrate.tsx` (123 lines), `frontend/src/pages/Refusals.tsx` (122 lines, live API calls for `AAPL $2`, `SPYon $250`, `ENLV $5.50`, catalog share-ratio trap `KLAC`, and catalog session-closed token `ICHR`), and `frontend/src/pages/Receipts.tsx` (79 lines, `live_only=true` filtering rows with `tx_hash`).
+  - Added SPA static file and deep-link fallback route in `backend/bine/app.py`. Gzip bundle grew by only `3.18 kB` (`101.34 kB -> 104.52 kB`).
+- **2026-10-03 (Item C — Root `README.md`)**:
+  - Created `README.md` with one-sentence product definition, 3-command zero-key quickstart, hosted URL (`https://bine-guard.fly.dev`), HTTP API / CLI / MCP / Wallet Skill usage, screenshot index, and safety defaults.
+- **2026-10-03 (Item A.6 — Re-capture & Inspect All 24 Screenshots)**:
+  - Re-captured all 24 screenshots (`BUY NVDA $5.50`, `REFUSE AAPL $2`, `REFUSE SPYon $250`, and `Confirm` dry-run panel at `390px`, `768px`, and `1440px` in Light and Dark themes) on the current 4-route build (`dist/assets/index-B71wR5wL.js`).
+  - Opened and inspected all 24 PNGs via `view_file`: confirmed `ui_confirm_light_1440.png` and all 5 other `ui_confirm_*` screenshots render the expanded `SIMULATION PASSED` panel (`Decision #9–#14`), all `768px` and `1440px` screenshots render the updated `Details` bar (`2 issuers · market offhours` / `1 issuer · market offhours`), and all 24 screenshots show the 4-route header (`Bine | Guard Integrate Refusals Receipts`) and `$5.50` default with zero defects.
+- **2026-10-03 (Item D — 12-Category Re-Score)**:
+  - Completed the 12-category evaluation (`minimalism`, `real-world usefulness`, `immediate usability`, `plug and play`, `technical execution`, `originality`, `UX`, `visual quality`, `demonstration potential`, `hackathon differentiation`, `clarity`, `technical story`) with concrete file, test, command, and screenshot evidence (`Overall: 9.0/10`, with live on-chain swap explicitly noted as `UNVERIFIED` pending user wallet execution).
 
 ## 6. Important Decisions
 - **5 bps Tie Band (`"Either works"`)**: When both issuers are eligible and within 5 bps on all-in price per share, Bine does not claim a price winner; it says `"Either works"` and picks deterministically (deeper AMM liquidity first → lower minimum order → alphabetical).
@@ -70,31 +93,35 @@
 - **Single Stateless Web Service**: No background worker is required in production; `decision_log` uses optional SQLite/Postgres.
 
 ## 7. Known Issues & Domain Quirks
-- **Ondo `$5` Minimum Order (`[40375]`)**: Ondo rejects orders under `$5.00` (`below_issuer_minimum`), while `bStocks` executes down to `$2.00`. Default demo amount is `$5.00` and `BINE_MAX_TRADE_USD=6.00` so both issuers are executable.
-- **`SPYon` Reproducible `+40.75%` Spread at `$250`**: `SPYon` executes at `-0.69%` (`$25`) and `-0.15%` (`$100`), then jumps to `+40.75%` above reference at `$250` across 5/5 runs. Caught deterministically by `slippage_too_high`.
+- **Ondo `$5` Minimum Order (`[40375]`)**: Ondo rejects orders under `$5.00` (and `$5.00` exact lands under `$5` after conversion; `$5.05+` succeeds), while `bStocks` executes down to `$2.00`. Default order amount is `$5.50` and `BINE_MAX_TRADE_USD=6.00` so both issuers are executable.
+- **`SPYon` Reproducible `+40.75%`–`+82.07%` Spread at `$250`**: `SPYon` executes near reference at `$25` and `$100`, then jumps to `+40.75%`–`+82.07%` above reference at `$250` across all runs. Caught deterministically by `slippage_too_high`.
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed Phases 0–9; awaiting user execution of the optional live `$5` swap (`Phase 4`).
+- Completed Items A (1–6), B, C, and D; awaiting user execution of the optional live `$2` `NVDAB` swap command.
 
 ## 9. Next Steps
-1. User can optionally fund the Agentic Wallet (`~0.002 BNB` + `$6 USDT` on BSC) and run the prepared `baw` / `bine buy NVDA 5` command to record a live on-chain `tx_hash`.
+1. User can optionally authenticate `baw` (`npx --yes @binance/agentic-wallet@1.10.0 auth signin`), fund the BSC wallet (`~0.001 BNB` + `$2 USDT`), and run the prepared `$2` `NVDAB` command to record a live on-chain `txHash`.
 
 ## 10. Important Files
 - `memory.md` — Primary AI context and handoff state.
+- `README.md` — Root documentation, 3-command quickstart, and safety defaults.
 - `docs/PROJECT_BRIEF.md` — Original brief.
 - `docs/friction-log.md` — Empirical friction log with raw API measurements.
 - `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
 - `docs/deploy.md` — Single-service deployment guide (Phase 2).
 - `tools/collect_evidence.py` — Standalone evidence sampler utility.
 - `backend/bine/client.py` — `BinanceClient` + `maybe_enable_dev_dns_fallback`.
-- `backend/bine/quality.py` — Data-quality filter (`assess_token_quality`).
+- `backend/bine/quality.py` — Data-quality filter (`assess_token_quality`, `MAX_SHARE_RATIO = 5.0`).
 - `backend/bine/quote_engine.py` — Live `/rwa/tokens` 60s cache + deterministic pre-trade guard (`schema_version: "1"`).
-- `backend/bine/execution.py` — Transaction API `/simulate` dry-run + `BINE_ADMIN_TOKEN` + `baw` execution.
-- `backend/bine/cli.py` — `bine check` and `bine buy` CLI entry point.
+- `backend/bine/execution.py` — Transaction API `/simulate` dry-run + `BINE_ADMIN_TOKEN` + `baw` (`npx` fallback) execution.
+- `backend/bine/cli.py` — `bine check` and `bine buy` CLI entry point (with hosted `BINE_API_URL` fallback).
 - `backend/bine/mcp_server.py` — Stdio MCP server (`bine_check`, `bine_buy`).
 - `skills/bine-pre-trade-guard/SKILL.md` — Wallet Skill for Binance Agentic Wallet.
-- `frontend/src/pages/Home.tsx` — One-screen pre-trade guard UI.
+- `frontend/src/pages/Home.tsx` — `/` Pre-trade guard UI.
+- `frontend/src/pages/Integrate.tsx` — `/integrate` copy-paste snippets & schema.
+- `frontend/src/pages/Refusals.tsx` — `/refusals` live API refusal cards.
+- `frontend/src/pages/Receipts.tsx` — `/receipts` live on-chain receipts table.
 
 ## 11. Environment & Configuration
 - **Python**: `3.13.0` virtualenv at `backend/.venv`.

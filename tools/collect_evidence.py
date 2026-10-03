@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
@@ -149,21 +149,6 @@ async def run_sample_tick(settings: Settings) -> None:
     logger.info("Sample tick complete")
 
 
-def create_scheduler(settings: Settings) -> AsyncIOScheduler:
-    """Create and configure the APScheduler for the sampler."""
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        run_sample_tick,
-        trigger="interval",
-        minutes=settings.bine_sample_interval_minutes,
-        args=[settings],
-        id="sample_tick",
-        replace_existing=True,
-        next_run_time=datetime.now(timezone.utc),
-    )
-    return scheduler
-
-
 async def run_sampler_standalone() -> None:
     """Entry point for running the evidence collector as a standalone process."""
     from bine.config import get_settings
@@ -173,18 +158,17 @@ async def run_sampler_standalone() -> None:
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
     settings = get_settings()
+    interval_minutes = int(os.environ.get("BINE_SAMPLE_INTERVAL_MINUTES", "5"))
     await init_db()
-    scheduler = create_scheduler(settings)
-    scheduler.start()
     logger.info(
         "Evidence collector started. Interval: %d min. Press Ctrl+C to stop.",
-        settings.bine_sample_interval_minutes,
+        interval_minutes,
     )
     try:
         while True:
-            await asyncio.sleep(60)
+            await run_sample_tick(settings)
+            await asyncio.sleep(interval_minutes * 60)
     except (KeyboardInterrupt, asyncio.CancelledError):
-        scheduler.shutdown(wait=False)
         logger.info("Evidence collector stopped.")
 
 

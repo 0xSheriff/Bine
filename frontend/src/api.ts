@@ -36,5 +36,5 @@ export const executeTrade = (
     )
     .then(r => r.data)
 
-export const fetchDecisions = (limit = 5): Promise<DecisionListResponse> =>
-  api.get('/decisions', { params: { limit } }).then(r => r.data)
+export const fetchDecisions = (limit = 5, live_only = false): Promise<DecisionListResponse> =>
+  api.get('/decisions', { params: { limit, live_only } }).then(r => r.data)

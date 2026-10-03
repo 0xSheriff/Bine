@@ -12,7 +12,6 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",          # async SQLite driver
-    "apscheduler>=3.10",
 ]
 
 [project.optional-dependencies]

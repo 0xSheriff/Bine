@@ -24,7 +24,7 @@ from typing import Any, AsyncGenerator, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -364,9 +364,45 @@ async def list_tickers() -> dict[str, Any]:
         }
         for tkr, issuers in sorted(by_ticker.items())
     ]
+
+    # Discover live catalog examples for /refusals (share-ratio trap & session-unsupported/closed)
+    ratio_candidates = [
+        r for r in rows
+        if (r.token_price or 0) >= 1.0 and r.token_to_share_ratio is not None and r.underlying_ticker.upper() != "ENLV"
+    ]
+    ratio_candidates.sort(key=lambda r: abs((r.token_to_share_ratio or 1.0) - 1.0), reverse=True)
+    share_ratio_row = ratio_candidates[0] if ratio_candidates else None
+
+    single_issuer_closed = [
+        r for r in rows
+        if len(by_ticker.get(r.underlying_ticker.upper(), [])) == 1
+        and assess_sample_row(r).reliable
+        and (r.open_state is not True or (r.reason_code is not None and r.reason_code != "TRADING") or r.market_status in ("paused", "closed"))
+    ]
+    single_issuer_closed.sort(
+        key=lambda r: (
+            0 if r.reason_code == "UNSUPPORTED" else (1 if r.underlying_ticker.upper() == "ICHR" else 2),
+            r.underlying_ticker.upper(),
+        )
+    )
+    closed_row = single_issuer_closed[0] if single_issuer_closed else None
+
     return {
         "count": len(items),
         "tickers": items,
+        "catalog_examples": {
+            "share_ratio": {
+                "ticker": share_ratio_row.underlying_ticker.upper() if share_ratio_row else "KLAC",
+                "symbol": share_ratio_row.token_symbol if share_ratio_row else "KLACon",
+                "token_to_share_ratio": round(share_ratio_row.token_to_share_ratio or 10.0261, 4) if share_ratio_row else 10.0261,
+            },
+            "session_closed": {
+                "ticker": closed_row.underlying_ticker.upper() if closed_row else "ICHR",
+                "symbol": closed_row.token_symbol if closed_row else "ICHRon",
+                "market_status": (closed_row.market_status if closed_row else "closed") or "closed",
+                "reason_code": (closed_row.reason_code if closed_row else "UNSUPPORTED") or "UNSUPPORTED",
+            },
+        },
     }
 
 
@@ -382,7 +418,7 @@ _QUOTE_CACHE_TTL_SEC = 15.0
 async def quote_stock(
     request: Request,
     ticker: str = Query(..., description="Underlying stock ticker (e.g. NVDA, AAPL, SPY, TSLA)"),
-    amount_usd: float = Query(5.0, description="USD amount to spend (USDT on BSC)"),
+    amount_usd: float = Query(5.5, description="USD amount to spend (USDT on BSC; default 5.50)"),
     details: bool = Query(
         False,
         include_in_schema=False,
@@ -444,7 +480,7 @@ async def quote_stock(
 
 class ExecuteRequest(BaseModel):
     ticker: str = Field(..., description="Underlying stock ticker, e.g. NVDA")
-    amount_usd: float = Field(5.0, description="USD amount to swap (USDT on BSC)")
+    amount_usd: float = Field(5.5, description="USD amount to swap (USDT on BSC; default 5.50)")
     execute_live: bool = Field(
         False,
         description="False = dry-run simulation only. True = dry-run first, then execute via Agentic Wallet if BINE_LIVE_MODE=true, BINE_ADMIN_TOKEN matches, and within cap.",
@@ -526,10 +562,16 @@ async def execute_stock_trade(
 
 
 @app.get("/api/decisions")
-async def list_decisions(limit: int = Query(5, ge=1, le=200)) -> dict[str, Any]:
+async def list_decisions(
+    limit: int = Query(5, ge=1, le=200),
+    live_only: bool = Query(False, description="When true, return only executed live trades with tx_hash"),
+) -> dict[str, Any]:
     """Return recent decisions, refusals, dry-run simulations, and live swaps from `decision_log`."""
     async with AsyncSessionLocal() as session:
-        q = select(DecisionLog).order_by(DecisionLog.id.desc()).limit(limit)
+        q = select(DecisionLog)
+        if live_only:
+            q = q.where(DecisionLog.tx_hash.is_not(None), DecisionLog.tx_hash != "")
+        q = q.order_by(DecisionLog.id.desc()).limit(limit)
         result = await session.execute(q)
         rows = list(result.scalars().all())
 
@@ -807,4 +849,22 @@ async def weekend_gap(
         "unreliable_excluded_count": unreliable_excluded,
         "tokens": [_row_to_dict(r, dual_tickers) for r in clean_rows[:limit]],
     }
+
+
+_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(full_path: str) -> Any:
+    """Serve built frontend static assets and SPA index.html fallback for deep links."""
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not Found")
+    if _FRONTEND_DIST.is_dir():
+        candidate = (_FRONTEND_DIST / full_path).resolve()
+        if full_path and candidate.is_file() and str(candidate).startswith(str(_FRONTEND_DIST.resolve())):
+            return FileResponse(candidate)
+        index_html = _FRONTEND_DIST / "index.html"
+        if index_html.is_file():
+            return FileResponse(index_html)
+    raise HTTPException(status_code=404, detail="Frontend build not found")
 

@@ -33,10 +33,11 @@ function formatBuyHeadline(q: QuoteVerdictResponse): string {
 export default function Home() {
   const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const initialTicker = (urlParams.get('ticker') || 'NVDA').trim().toUpperCase()
-  const initialAmount = Number(urlParams.get('amount') || '5') || 5
+  const rawAmtParam = urlParams.get('amount')
+  const initialAmount = rawAmtParam ? Number(rawAmtParam) || 5.5 : 5.5
 
   const [tickerInput, setTickerInput] = useState<string>(initialTicker)
-  const [amountInput, setAmountInput] = useState<string>(String(initialAmount))
+  const [amountInput, setAmountInput] = useState<string>(rawAmtParam || '5.50')
   const [activeTicker, setActiveTicker] = useState<string>(initialTicker)
   const [activeAmount, setActiveAmount] = useState<number>(initialAmount)
   const [confirmOpen, setConfirmOpen] = useState<boolean>(false)

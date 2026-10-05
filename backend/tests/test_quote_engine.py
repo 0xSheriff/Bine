@@ -555,25 +555,28 @@ async def test_cli_and_mcp_server_tools(
             return Response(200, json=nvda_ondo_liq_fixture)
         return Response(200, json=nvda_bstock_liq_fixture)
 
-    with respx.mock(base_url="https://web3.binance.com/build") as respx_mock:
-        respx_mock.get("/api/v1/dex/market/rwa/tokens").mock(side_effect=_rwa_router)
-        respx_mock.get("/api/v1/dex/aggregator/quote").mock(side_effect=_quote_router)
-        respx_mock.get("/api/v1/dex/market/token/top-liquidity").mock(side_effect=_liq_router)
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/market/rwa/tokens").mock(side_effect=_rwa_router)
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/aggregator/quote").mock(side_effect=_quote_router)
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/market/token/top-liquidity").mock(side_effect=_liq_router)
 
-        # 1. Direct async check + CLI plain-English formatter
+        # 1. Direct async check (BINE_DIRECT_MODE=true) + CLI plain-English formatter
+        monkeypatch.setenv("BINE_DIRECT_MODE", "true")
         res = await run_check("NVDA", 25.0)
         assert set(res.keys()) == FROZEN_PHASE1_KEYS
         line = format_plain_check_line(res)
         assert line.startswith("BUY: Buy ")
         assert "NVDA" in line
 
-        # 2. MCP tools/list
+        # 2. Default BINE_API_URL=http://localhost:8000 check + MCP tools/list & tools/call
+        monkeypatch.delenv("BINE_DIRECT_MODE", raising=False)
+        respx_mock.get("http://localhost:8000/api/quote").mock(return_value=Response(200, json=res))
+
         list_resp = await handle_jsonrpc_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         assert list_resp is not None
         tool_names = [t["name"] for t in list_resp["result"]["tools"]]
         assert tool_names == ["bine_check", "bine_buy"]
 
-        # 3. MCP tools/call -> bine_check
         call_resp = await handle_jsonrpc_message(
             {
                 "jsonrpc": "2.0",
@@ -587,3 +590,30 @@ async def test_cli_and_mcp_server_tools(
         assert sc["schema_version"] == "1"
         assert sc["verdict"] == "BUY"
         assert call_resp["result"]["isError"] is False
+
+
+def test_cli_unreachable_backend_prints_single_line(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    """If the backend is unreachable, `bine` prints one clear line and returns exit code 1."""
+    import httpx as _httpx
+
+    from bine.cli import main as cli_main
+
+    monkeypatch.setenv("BINANCE_API_KEY", "")
+    monkeypatch.setenv("BINANCE_SECRET_KEY", "")
+    monkeypatch.delenv("BINE_API_URL", raising=False)
+
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.get("http://localhost:8000/api/quote").mock(
+            side_effect=_httpx.ConnectError("Connection refused")
+        )
+        rc = cli_main(["check", "NVDA", "5.50"])
+        captured = capsys.readouterr()
+        out_lines = [ln for ln in captured.out.strip().splitlines() if ln.strip()]
+        assert rc == 1
+        assert len(out_lines) == 1
+        assert "Cannot reach Bine backend at http://localhost:8000" in out_lines[0]
+        assert "uvicorn bine.app:app" in out_lines[0]
+

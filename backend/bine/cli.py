@@ -29,11 +29,25 @@ from bine.quote_engine import (
 )
 
 
-def _should_use_hosted_api(cfg: Settings) -> bool:
-    """Use hosted BINE_API_URL when no local Binance keys are set, or when BINE_API_URL is explicitly set in env."""
-    if os.environ.get("BINE_API_URL"):
-        return True
-    return not bool(cfg.binance_api_key.strip() and cfg.binance_secret_key.strip())
+DEFAULT_BINE_API_URL = "http://localhost:8000"
+
+
+class BackendUnreachableError(RuntimeError):
+    """Raised when the Bine HTTP backend at BINE_API_URL cannot be reached."""
+
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url
+        super().__init__(
+            f"Cannot reach Bine backend at {base_url} — start it with: "
+            "uvicorn bine.app:app --app-dir backend --port 8000"
+        )
+
+
+def _should_use_api_url(cfg: Settings) -> bool:
+    """Use BINE_API_URL (default http://localhost:8000) unless BINE_DIRECT_MODE=true is set."""
+    if os.environ.get("BINE_DIRECT_MODE", "").strip().lower() in ("1", "true", "yes"):
+        return False
+    return bool(cfg.bine_api_url.strip())
 
 
 def format_plain_check_line(result: dict[str, Any]) -> str:
@@ -72,19 +86,22 @@ async def run_check(
     settings: Settings | None = None,
     include_details: bool = False,
 ) -> dict[str, Any]:
-    """Run the pre-trade quote check (direct mode when keys exist, hosted BINE_API_URL otherwise)."""
+    """Run the pre-trade quote check via BINE_API_URL (default http://localhost:8000) or direct mode."""
     cfg = settings or get_settings()
     ticker_upper = ticker.strip().upper()
 
-    if settings is None and _should_use_hosted_api(cfg):
-        base = cfg.bine_api_url.rstrip("/")
+    if settings is None and _should_use_api_url(cfg):
+        base = (os.environ.get("BINE_API_URL") or cfg.bine_api_url or DEFAULT_BINE_API_URL).rstrip("/")
         params: dict[str, Any] = {"ticker": ticker_upper, "amount_usd": amount_usd}
         if include_details:
             params["details"] = "true"
-        async with httpx.AsyncClient(timeout=15.0) as hc:
-            resp = await hc.get(f"{base}/api/quote", params=params)
-            resp.raise_for_status()
-            return dict(resp.json())
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as hc:
+                resp = await hc.get(f"{base}/api/quote", params=params)
+                resp.raise_for_status()
+                return dict(resp.json())
+        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+            raise BackendUnreachableError(base) from exc
 
     maybe_enable_dev_dns_fallback(cfg.dev_dns_fallback)
     wallet = cfg.bine_wallet_address or DEFAULT_QUOTE_WALLET
@@ -132,15 +149,18 @@ async def run_buy_step(
     cfg = settings or get_settings()
     ticker_upper = ticker.strip().upper()
 
-    if settings is None and not execute_live and _should_use_hosted_api(cfg):
-        base = cfg.bine_api_url.rstrip("/")
-        async with httpx.AsyncClient(timeout=20.0) as hc:
-            resp = await hc.post(
-                f"{base}/api/execute",
-                json={"ticker": ticker_upper, "amount_usd": amount_usd, "execute_live": False},
-            )
-            resp.raise_for_status()
-            return dict(resp.json())
+    if settings is None and not execute_live and _should_use_api_url(cfg):
+        base = (os.environ.get("BINE_API_URL") or cfg.bine_api_url or DEFAULT_BINE_API_URL).rstrip("/")
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as hc:
+                resp = await hc.post(
+                    f"{base}/api/execute",
+                    json={"ticker": ticker_upper, "amount_usd": amount_usd, "execute_live": False},
+                )
+                resp.raise_for_status()
+                return dict(resp.json())
+        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+            raise BackendUnreachableError(base) from exc
 
     maybe_enable_dev_dns_fallback(cfg.dev_dns_fallback)
     await init_db()
@@ -190,7 +210,11 @@ async def run_buy_step(
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
-    result = asyncio.run(run_check(args.ticker, args.amount_usd, include_details=False))
+    try:
+        result = asyncio.run(run_check(args.ticker, args.amount_usd, include_details=False))
+    except BackendUnreachableError as exc:
+        print(str(exc))
+        return 1
     if args.json:
         print(json.dumps(result, indent=2))
     else:
@@ -203,9 +227,13 @@ def _cmd_check(args: argparse.Namespace) -> int:
 
 def _cmd_buy(args: argparse.Namespace) -> int:
     settings = get_settings()
-    dry_result = asyncio.run(
-        run_buy_step(args.ticker, args.amount_usd, execute_live=False, settings=settings)
-    )
+    try:
+        dry_result = asyncio.run(
+            run_buy_step(args.ticker, args.amount_usd, execute_live=False)
+        )
+    except BackendUnreachableError as exc:
+        print(str(exc))
+        return 1
     quote = dry_result.get("quote") or {}
     print(format_plain_check_line(quote))
 
@@ -236,9 +264,13 @@ def _cmd_buy(args: argparse.Namespace) -> int:
             print("Cancelled.")
             return 1
 
-    live_result = asyncio.run(
-        run_buy_step(args.ticker, args.amount_usd, execute_live=True, settings=settings)
-    )
+    try:
+        live_result = asyncio.run(
+            run_buy_step(args.ticker, args.amount_usd, execute_live=True, settings=settings)
+        )
+    except BackendUnreachableError as exc:
+        print(str(exc))
+        return 1
     live_exec = live_result.get("execution") or {}
     print(f"Execution status: {live_exec.get('status')} — {live_exec.get('detail')}")
     if live_exec.get("tx_hash"):
@@ -251,7 +283,7 @@ def _cmd_buy(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bine",
-        description="Bine — Pre-trade guard for tokenized stocks on BSC (uses hosted BINE_API_URL when no Binance keys are set).",
+        description="Bine — Pre-trade guard for tokenized stocks on BSC (defaults to BINE_API_URL=http://localhost:8000).",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -274,7 +306,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    return int(args.func(args))
+    try:
+        return int(args.func(args))
+    except BackendUnreachableError as exc:
+        print(str(exc))
+        return 1
 
 
 if __name__ == "__main__":

@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { TopHeader } from '../components/shared'
 
-const HOSTED_URL = 'https://bine-guard.fly.dev'
+const DEFAULT_API_URL = 'http://localhost:8000'
 
 const SNIPPETS = [
   {
     id: 'curl',
-    title: '1. Hosted HTTP API (curl — no keys needed)',
-    code: `curl -s "${HOSTED_URL}/api/quote?ticker=NVDA&amount_usd=5.50" | jq .`,
+    title: '1. HTTP API (curl)',
+    code: `curl -s "${DEFAULT_API_URL}/api/quote?ticker=NVDA&amount_usd=5.50" | jq .`,
   },
   {
     id: 'cli',
-    title: '2. CLI (bine check — defaults to hosted API when no keys are set)',
+    title: '2. CLI (bine check — defaults to BINE_API_URL=http://localhost:8000)',
     code: `pip install -e backend\nbine check NVDA 5.50\nbine check SPYon 250 --json`,
   },
   {
@@ -23,7 +23,7 @@ const SNIPPETS = [
           'bine-pre-trade-guard': {
             command: 'bine-mcp',
             env: {
-              BINE_API_URL: HOSTED_URL,
+              BINE_API_URL: DEFAULT_API_URL,
             },
           },
         },

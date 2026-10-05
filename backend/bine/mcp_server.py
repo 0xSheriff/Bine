@@ -15,7 +15,9 @@ import json
 import sys
 from typing import Any
 
-from bine.cli import format_plain_check_line, run_buy_step, run_check
+from bine.cli import DEFAULT_BINE_API_URL, format_plain_check_line, run_buy_step, run_check
+
+BINE_API_URL = DEFAULT_BINE_API_URL
 
 SERVER_INFO = {
     "name": "bine-pre-trade-guard",

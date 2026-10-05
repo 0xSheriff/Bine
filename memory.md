@@ -29,7 +29,7 @@
 - **Phases 0–9 Complete (except live on-chain swap, which is gated and ready for user execution)**:
   - **Phase 0**: Reconciled summary contradictions, verified `baw` CLI flags and order lifecycle, proved `SPYon` `$250` `+40.75%` spread across 5/5 runs, and separated `below_issuer_minimum`.
   - **Phase 1**: Frozen `GET /api/quote` `schema_version: "1"` contract with 13 top-level keys, 8 refusal codes, 5 bps tie band (`Either works`), deterministic tiebreak, and any-ticker (`448` tickers including `AAPL`) support.
-  - **Phase 2**: Removed background sampler from the live request path; `/api/quote` uses a 60s in-memory `/rwa/tokens` cache; moved sampler to `tools/collect_evidence.py`; simplified `backend/Procfile` and `docs/deploy.md`; removed `/evidence` page.
+  - **Phase 2**: Removed background sampler from the live request path; `/api/quote` uses a 60s in-memory `/rwa/tokens` cache; moved sampler to `tools/collect_evidence.py`; simplified `backend/Procfile` and `docs/optional-hosting.md`; removed `/evidence` page.
   - **Phase 3**: Implemented `bine` CLI (`backend/bine/cli.py`), stdio MCP server (`backend/bine/mcp_server.py`), and Binance Wallet Skill (`skills/bine-pre-trade-guard/SKILL.md`).
   - **Phase 4**: Set default demo amount to `$5.00`, `BINE_MAX_TRADE_USD=6.00`, added `BINE_ADMIN_TOKEN` `403` gate on `execute_live=true`, per-IP sliding-window rate limiting, tightened CORS, and documented approval handling. Live swap remains `UNVERIFIED` pending user wallet funding and command execution.
   - **Phase 5 & 6**: Rebuilt `frontend/` into a single-screen pre-trade guard with zero-flash Light & Dark themes (`prefers-color-scheme` + `localStorage['bine-theme']` + sun/moon toggle), plain-English main view, inline dry-run confirm panel, and collapsed `<details>` disclosure.
@@ -40,7 +40,7 @@
 - **2026-10-02 (Item 1 — State Check & Dead Code Trim)**:
   - Verified `48/48` `pytest -v` tests pass and `npm run build` succeeds (`274ms`, 0 TypeScript errors).
   - Removed dead legacy files (`backend/bine/sampler.py`, `backend/bine/schemas.py`, `docs/deploy-always-on.md`, `frontend/src/pages/Evidence.tsx`, `frontend/src/pages/Compare.tsx`, `frontend/src/pages/WeekendGap.tsx`, `frontend/src/pages/TokenDetail.tsx`, `frontend/src/pages/Agent.tsx`, `frontend/src/pages/HowItWorks.tsx`).
-  - Added new rebuild files: `backend/bine/cli.py` (242 lines), `backend/bine/mcp_server.py` (204 lines), `tools/collect_evidence.py`, `skills/bine-pre-trade-guard/SKILL.md`, `docs/deploy.md`, `docs/devex-facts.md`.
+  - Added new rebuild files: `backend/bine/cli.py` (242 lines), `backend/bine/mcp_server.py` (204 lines), `tools/collect_evidence.py`, `skills/bine-pre-trade-guard/SKILL.md`, `docs/optional-hosting.md`, `docs/devex-facts.md`.
   - Trimmed `backend/bine/quote_engine.py` from `1,014` lines (697 pre-rebuild baseline) down to `657` lines and `frontend/src/pages/Home.tsx` from `1,035` lines (baseline) down to `625` lines (`3,982` total lines across all `backend/bine/*.py` + `frontend/src/pages/*.tsx`).
 - **2026-10-02 (Item 2 — Clean Install in `/tmp/v`)**:
   - Updated `backend/pyproject.toml` `[project.scripts]` with `bine = "bine.cli:main"` and `bine-mcp = "bine.mcp_server:main"`.
@@ -55,7 +55,7 @@
   - Verified `run_agentic_wallet_swap()` in `backend/bine/execution.py` polls `baw market-order list --orderId <id> --json` and handles `FINISHED` (`txHash` -> `LIVE_SUBMITTED`), `FAILED` (`LIVE_ERROR`), and polling timeout (`LIVE_TIMEOUT`). Added `test_baw_async_order_polling_finished_failed_and_timeout` (`49/49` pytest tests pass).
   - Documented per-issuer `baw` routing in `docs/devex-facts.md` (`bstock` -> `/web-dex/agent/place-order`, `ondo` -> `/web-dex/ondo/place-order`) and labeled Ondo aggregator quotes as indicative in `frontend/src/pages/Home.tsx` and `backend/bine/quote_engine.py`.
 - **2026-10-02 (Item 6 — Safety Gates & Secret Scan Verified)**:
-  - Verified constant-time `hmac.compare_digest` check for `BINE_ADMIN_TOKEN` gating `execute_live=true` in `backend/bine/app.py` (lines 472–480) and `backend/bine/execution.py` (lines 575–587), sliding-window per-IP rate limiting (`60/min` on `/api/quote`, `20/min` on `/api/execute`), restricted CORS (`GET, POST` and `Content-Type, X-Bine-Admin-Token`), and `BINE_LIVE_MODE=false` in `docs/deploy.md`.
+  - Verified constant-time `hmac.compare_digest` check for `BINE_ADMIN_TOKEN` gating `execute_live=true` in `backend/bine/app.py` (lines 472–480) and `backend/bine/execution.py` (lines 575–587), sliding-window per-IP rate limiting (`60/min` on `/api/quote`, `20/min` on `/api/execute`), restricted CORS (`GET, POST` and `Content-Type, X-Bine-Admin-Token`), and `BINE_LIVE_MODE=false` in `docs/optional-hosting.md`.
   - Confirmed `git check-ignore -v .env` matches `Bine/.gitignore:1:.env` and verified `0` occurrences of `BINANCE_API_KEY` or `BINANCE_SECRET_KEY` across the working tree and git commit history.
 - **2026-10-02 (Item 7 — UI Verification & Cold-Load Latency)**:
   - Fixed `quote_stock()` in `backend/bine/app.py` so `GET /api/quote?details=true` preserves the optional `details.issuers` payload while keeping `QuoteResponseModel` on `/docs`.
@@ -71,8 +71,8 @@
 - **2026-10-03 (Item A.3 — `$5.50` Default Amount & Plain-English Minimum Copy)**:
   - Set default order amount to `$5.50` across UI, CLI help, MCP descriptions, `app.py`, `SKILL.md`, and `README.md`.
   - Updated `below_issuer_minimum` message in `backend/bine/quote_engine.py` to `"Ondo's minimum order is $5. After conversion your $5.00 lands just under it. Try $5.50."` and documented the `5.00` vs `5.05` `[40375]` test in `docs/devex-facts.md` (`UNVERIFIED` internal cause since `data` is `null` on `40375`).
-- **2026-10-03 (Item A.4 — Hosted Read-Only `BINE_API_URL` Default for CLI & MCP)**:
-  - Updated `backend/bine/config.py` (`bine_api_url`) and `backend/bine/cli.py` (`_should_use_hosted_api`) so `bine` and `bine-mcp` automatically query `BINE_API_URL` when no local Binance keys are set (or when `BINE_API_URL` is set in env), while preserving direct mode when keys are present.
+- **2026-10-03 (Item A.4 — Local `BINE_API_URL` Default for CLI & MCP)**:
+  - Updated `backend/bine/config.py` (`bine_api_url = "http://localhost:8000"`), `backend/bine/cli.py`, and `backend/bine/mcp_server.py` so `bine` and `bine-mcp` default `BINE_API_URL` to `http://localhost:8000` and print a single clear line showing how to start `uvicorn bine.app:app --app-dir backend --port 8000` when the backend is unreachable.
 - **2026-10-03 (Item A.5 — Remove `apscheduler` and `test_sampler.py`)**:
   - Removed `apscheduler>=3.10` from `backend/pyproject.toml`, removed `bine_sample_interval_minutes` from `backend/bine/config.py`, deleted `backend/tests/test_sampler.py`, and updated `tools/collect_evidence.py` to use a plain `asyncio.sleep` loop with zero `apscheduler` dependency.
 - **2026-10-03 (Item B — Four Routes `/`, `/integrate`, `/refusals`, `/receipts` & SPA Fallback)**:
@@ -80,7 +80,7 @@
   - Added `frontend/src/pages/Integrate.tsx` (123 lines), `frontend/src/pages/Refusals.tsx` (122 lines, live API calls for `AAPL $2`, `SPYon $250`, `ENLV $5.50`, catalog share-ratio trap `KLAC`, and catalog session-closed token `ICHR`), and `frontend/src/pages/Receipts.tsx` (79 lines, `live_only=true` filtering rows with `tx_hash`).
   - Added SPA static file and deep-link fallback route in `backend/bine/app.py`. Gzip bundle grew by only `3.18 kB` (`101.34 kB -> 104.52 kB`).
 - **2026-10-03 (Item C — Root `README.md`)**:
-  - Created `README.md` with one-sentence product definition, 3-command zero-key quickstart, hosted URL (`https://bine-guard.fly.dev`), HTTP API / CLI / MCP / Wallet Skill usage, screenshot index, and safety defaults.
+  - Created `README.md` with one-sentence product definition, "Run it in 3 commands" quickstart, local URL (`http://localhost:8000`), HTTP API / CLI / MCP / Wallet Skill usage, screenshot index, and safety defaults.
 - **2026-10-03 (Item A.6 — Re-capture & Inspect All 24 Screenshots)**:
   - Re-captured all 24 screenshots (`BUY NVDA $5.50`, `REFUSE AAPL $2`, `REFUSE SPYon $250`, and `Confirm` dry-run panel at `390px`, `768px`, and `1440px` in Light and Dark themes) on the current 4-route build (`dist/assets/index-B71wR5wL.js`).
   - Opened and inspected all 24 PNGs via `view_file`: confirmed `ui_confirm_light_1440.png` and all 5 other `ui_confirm_*` screenshots render the expanded `SIMULATION PASSED` panel (`Decision #9–#14`), all `768px` and `1440px` screenshots render the updated `Details` bar (`2 issuers · market offhours` / `1 issuer · market offhours`), and all 24 screenshots show the 4-route header (`Bine | Guard Integrate Refusals Receipts`) and `$5.50` default with zero defects.
@@ -103,10 +103,10 @@
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed all items including the live `$2.00` `NVDAB` swap (`txHash: 0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`) and on-chain verification.
+- Completed all items including the live `$2.00` `NVDAB` swap (`txHash: 0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`), on-chain verification, and local `BINE_API_URL=http://localhost:8000` default.
 
 ## 9. Next Steps
-1. Ready for final submission or deployment (`docs/deploy.md`).
+1. Ready for final submission (optional single-service hosting notes in `docs/optional-hosting.md`).
 
 ## 10. Important Files
 - `memory.md` — Primary AI context and handoff state.
@@ -114,7 +114,7 @@
 - `docs/PROJECT_BRIEF.md` — Original brief.
 - `docs/friction-log.md` — Empirical friction log with raw API measurements.
 - `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
-- `docs/deploy.md` — Single-service deployment guide (Phase 2).
+- `docs/optional-hosting.md` — Optional single-service hosting guide (Phase 2).
 - `docs/dry_run_nvda_2usd.json` — Saved Transaction API dry-run output before live swap.
 - `docs/live_swap_nvda_2usd.json` — Saved `$2.00` `NVDAB` live swap receipt (`Decision #16`).
 - `tools/collect_evidence.py` — Standalone evidence sampler utility.
@@ -122,7 +122,7 @@
 - `backend/bine/quality.py` — Data-quality filter (`assess_token_quality`, `MAX_SHARE_RATIO = 5.0`).
 - `backend/bine/quote_engine.py` — Live `/rwa/tokens` 60s cache + deterministic pre-trade guard (`schema_version: "1"`).
 - `backend/bine/execution.py` — Transaction API `/simulate` dry-run + `BINE_ADMIN_TOKEN` + `baw` (`npx` fallback) execution.
-- `backend/bine/cli.py` — `bine check` and `bine buy` CLI entry point (with hosted `BINE_API_URL` fallback).
+- `backend/bine/cli.py` — `bine check` and `bine buy` CLI entry point (defaults to `BINE_API_URL=http://localhost:8000`).
 - `backend/bine/mcp_server.py` — Stdio MCP server (`bine_check`, `bine_buy`).
 - `skills/bine-pre-trade-guard/SKILL.md` — Wallet Skill for Binance Agentic Wallet.
 - `frontend/src/pages/Home.tsx` — `/` Pre-trade guard UI.

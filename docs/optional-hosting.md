@@ -1,4 +1,6 @@
-# Bine Deployment Guide
+# Optional Hosting Guide (Bine)
+
+> **Optional**: Bine runs locally on `http://localhost:8000` by default (`BINE_API_URL=http://localhost:8000`). Hosting is optional and only needed if you want to share a single read-only Bine backend across multiple machines.
 
 Bine runs as a **single stateless FastAPI web service** (`uvicorn bine.app:app`) with an optional SQLite or Postgres database used only for the `decision_log` audit table. No background sampler or worker process is required — `/api/quote` fetches RWA token metadata live on demand with a 60-second in-memory cache.
 

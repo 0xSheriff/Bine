@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     binance_api_key: str = ""
     binance_secret_key: str = ""
 
-    # Hosted read-only Bine API fallback when no local Binance keys are configured
-    bine_api_url: str = "https://bine-guard.fly.dev"
+    # Local Bine backend URL used by the CLI (`bine`) and MCP server (`bine-mcp`)
+    bine_api_url: str = "http://localhost:8000"
 
     # Agent execution — off by default, tiny caps ($6 max so Ondo's $5.50 default works)
     bine_live_mode: bool = False

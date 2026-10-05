@@ -1,0 +1,28 @@
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "binanceChainId": "56",
+        "txHash": "0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506",
+        "status": "SUCCESS",
+        "type": "swap",
+        "fromAddress": "0x34daabcaba08a9365c229e2ac7b25c14c6a6b730",
+        "toAddress": "0xb300000b72deaeb607a12d5f54773d1c19c7028d",
+        "feeValue": "47976548789549",
+        "txTime": "1791062297"
+      },
+      {
+        "binanceChainId": "56",
+        "txHash": "0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64",
+        "status": "SUCCESS",
+        "type": "approve",
+        "fromAddress": "0x34daabcaba08a9365c229e2ac7b25c14c6a6b730",
+        "toAddress": "0x55d398326f99059ff775485246999027b3197955",
+        "amount": "2000000000000000000",
+        "feeValue": "2932518144096",
+        "txTime": "1791062291"
+      }
+    ]
+  }
+}

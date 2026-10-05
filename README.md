@@ -4,21 +4,21 @@
 
 ---
 
-## 3-Command Quickstart (No Binance API Keys Needed)
+## Run it in 3 commands
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -e backend
+git clone <repo-url> bine && cd bine && python3 -m venv .venv && .venv/bin/pip install -e backend
+cp .env.example .env && (.venv/bin/uvicorn bine.app:app --app-dir backend --port 8000 &)
 .venv/bin/bine check NVDA 5.50
-.venv/bin/bine check SPYon 250 --json
 ```
 
-When `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` are not set locally, `bine` and `bine-mcp` automatically query the read-only hosted API (`BINE_API_URL`, default `https://bine-guard.fly.dev`). When keys are present in `.env`, Bine runs in direct signed mode against `https://web3.binance.com/build`.
+Set `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` in `.env` before starting `uvicorn`. `bine` and `bine-mcp` connect to `BINE_API_URL` (default `http://localhost:8000`). If `http://localhost:8000` is not running, `bine` prints a single line showing how to start it (`uvicorn bine.app:app --app-dir backend --port 8000`). Optional single-service hosting notes are in [`docs/optional-hosting.md`](docs/optional-hosting.md).
 
 ---
 
-## Hosted URL & Web Routes
+## Local URL & Web Routes
 
-- **Hosted API & Web App**: `https://bine-guard.fly.dev`
+- **Local API & Web App**: `http://localhost:8000` (frontend dev server: `http://localhost:5173`)
 - **Routes**:
   - `/` — Pre-trade guard (`NVDA` at `$5.50` default) + Transaction API `/simulate` dry-run
   - `/integrate` — Copy-paste snippets for `curl`, `bine`, MCP config JSON, Wallet Skill install, and frozen v1 schema
@@ -32,7 +32,7 @@ When `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` are not set locally, `bine` and 
 ### 1. HTTP API (`schema_version: "1"`)
 
 ```bash
-curl -s "https://bine-guard.fly.dev/api/quote?ticker=NVDA&amount_usd=5.50" | jq .
+curl -s "http://localhost:8000/api/quote?ticker=NVDA&amount_usd=5.50" | jq .
 ```
 
 ```json
@@ -81,7 +81,7 @@ bine buy NVDA 5.50            # Pre-trade guard + /pre-transaction/simulate dry-
     "bine-pre-trade-guard": {
       "command": "bine-mcp",
       "env": {
-        "BINE_API_URL": "https://bine-guard.fly.dev"
+        "BINE_API_URL": "http://localhost:8000"
       }
     }
   }
@@ -118,3 +118,12 @@ cp skills/bine-pre-trade-guard/SKILL.md ~/.claude/skills/bine-pre-trade-guard/SK
 - **`BINE_ADMIN_TOKEN` constant-time gate**: Any request with `execute_live=true` requires a matching `X-Bine-Admin-Token` header (`hmac.compare_digest`), returning `HTTP 403` otherwise.
 - **Hard trade caps**: `BINE_MAX_TRADE_USD=6.00` per trade and `BINE_DAILY_CAP_USD=10.00` per UTC day.
 - **Rate limits & CORS**: Sliding-window per-IP rate limits (`60 req/min` on `/api/quote`, `20 req/min` on `/api/execute`) and explicit `GET, POST` origin allowlist.
+
+---
+
+## Verified On-Chain Execution & Evidence Artifacts
+
+- **Dry-run artifact (`docs/dry_run_nvda_2usd.json`)**: `"passed": true` with `"fail_reason": "execution reverted: BEP20: transfer amount exceeds allowance"` is the expected pre-approval state when simulating raw `/api/v1/dex/aggregator/swap` calldata before USDT is approved to the router (`0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5`), and the approval simulation (`"approval_simulation_status": "SUCCESS"`) returned `SUCCESS`.
+- **Live `$2` `NVDAB` swap artifact (`docs/live_swap_nvda_2usd.json`) & reconciliation note**: First-time swaps run an `approve` tx (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`) before the `swap` tx (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`). `baw market-order swap` returns the parent `orderId` (`26100300001937918699`), `--orderId` on it returns an empty list, and only `baw market-order list --json` shows the child (`orderId` `26100300001937918737`). The first live `$2` `NVDAB` swap recorded the parent `orderId` (`26100300001937918699`) and no `txHash`; `docs/live_swap_nvda_2usd.json` and `DecisionLog #16` were reconciled afterwards from `baw market-order list` (child `orderId` `26100300001937918737`) and the BSC receipt for `0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`. Untouched `baw` outputs and the commands that produced them are kept in `docs/raw/`.
+- **Share-ratio balance reconciliation**: `baw wallet balance` shows `0.00851201289192116` `NVDAB`, while `eth_call` `balanceOf(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730)` returns `8505393792444895` wei (`0.0085053938` raw tokens). The gap equals `tokenToShareRatio` `1.0007782237528078` (`0.008505393792444894 * 1.0007782237528078 = 0.00851201289192116`).
+

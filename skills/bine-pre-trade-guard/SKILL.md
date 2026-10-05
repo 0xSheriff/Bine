@@ -41,7 +41,7 @@ Never bypass a `REFUSE` verdict. Bine refuses trades when:
 
 ## Workflow for Agentic Wallet (`baw`) Swaps
 
-1. **Run the pre-trade guard first** (works with zero Binance keys via hosted `BINE_API_URL`, or direct mode when keys are present):
+1. **Run the pre-trade guard first** (connects to `BINE_API_URL`, default `http://localhost:8000`):
    ```bash
    bine check NVDA 5.50 --json
    ```

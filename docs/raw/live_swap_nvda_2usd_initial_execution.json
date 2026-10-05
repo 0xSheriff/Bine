@@ -1,0 +1,16 @@
+{
+  "attempted": true,
+  "live_mode_enabled": true,
+  "status": "LIVE_TIMEOUT",
+  "order_id": "26100300001937918699",
+  "tx_hash": null,
+  "bsctrace_url": null,
+  "baw_command": "npx --yes @binance/agentic-wallet@1.10.0 market-order swap --fromTokenQty 2 --fromToken 0x55d398326f99059fF775485246999027B3197955 --toToken 0x02fca66c1d1afb4e2a7884261eb00f63598a7436 --binanceChainId 56 --slippage 0.5 --mev true --gasLevel MEDIUM --json",
+  "detail": "Timed out polling `baw market-order list --orderId 26100300001937918699` after 25 attempts (50.0s).",
+  "raw_output": {
+    "success": true,
+    "data": {
+      "orderId": "26100300001937918699"
+    }
+  }
+}

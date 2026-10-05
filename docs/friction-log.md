@@ -238,3 +238,18 @@ All entries are factual. Timestamps are UTC.
   2. Expose a `baw market-order swap --dry-run` flag in `@binance/agentic-wallet` that simulates the exact `place-order` transaction against `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`.
   3. Fix `baw wallet tx-history` so `instructions.approve.amount` reflects the actual on-chain ERC-20 `Approval` event amount (`uint256.max`) rather than the swap's `fromTokenQty` (`2000000000000000000`).
 
+## 2026-10-05T23:43Z — Unit Question on High-Ratio Tokens (`NOWon`, `CVNAon`, `KLACon`, `PPLTon` at `$5.50`)
+
+| Token Symbol | `tokenToShareRatio` | `tokenPrice` (`/rwa/tokens`) | `referencePrice` (`/rwa/tokens`) | Quote `toTokenAmount` (`$5.50`, decimal / wei) | `5.50 / toTokenAmount` | `toToken.tokenUnitPrice` (`/aggregator/quote`) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `NOWon` | `5.0` | `3402.431825` | `680.486365` | `0.008074315104168431` (`8074315104168432`) | `681.172326` | `680.486365` |
+| `CVNAon` | `5.0` | `1594.35715` | `318.87143` | `0.017204822889777139` (`17204822889777138`) | `319.677804` | `318.87143` |
+| `KLACon` | `10.026064925604905` | `20851.518343680076` | `2079.7310309081245` | `0.002642654665300624` (`2642654665300624`) | `2081.240531` | `2079.731030908124302661` |
+| `PPLTon` | `10.0` | `1554.4324` | `155.44324` | `0.035197190489297606` (`35197190489297605`) | `156.262472` | `155.44324` |
+
+- **1. Where `quote_engine.py` converts `toTokenAmount` to shares and by what factor**:
+  - In `backend/bine/quote_engine.py` inside `evaluate_issuer_quote()` (lines 360–365), the engine computes `tokens_out = int(best_route["toTokenAmount"]) / (10 ** to_decimals)` (with `to_decimals = 18`) and then multiplies by `ratio = sample.token_to_share_ratio`: `shares_out = tokens_out * ratio`. It then computes `execution_price_per_share_usd = round(amount_usd / shares_out, 4)` (line 370).
+- **2. What is verified on-chain**:
+  - The only case verified on-chain is `NVDAB` (`tokenToShareRatio = 1.0007782237528078`, ~`1.0008`), where on-chain ERC-20 `balanceOf` times `tokenToShareRatio` matched the share balance reported by `baw wallet balance` and `toTokenActualQty` (`0.008505393792444894 * 1.0007782237528078 = 0.00851201289192116` after swap 1, and `0.016926469875736379 * 1.0007782237528078 = 0.016939642456644862` after swap 2; see `docs/raw/`).
+- **3. What is unverified**:
+  - No token with `tokenToShareRatio` different from `1` by more than a fraction of a percent has ever been traded on-chain, so it is not known whether `toTokenAmount` from `GET /api/v1/dex/aggregator/quote` is in token units or share units for those tokens.

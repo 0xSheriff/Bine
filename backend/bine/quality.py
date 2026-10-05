@@ -65,7 +65,12 @@ def assess_token_quality(
         return QualityCheck(
             False,
             "unreliable",
-            f"Share ratio {token_to_share_ratio:.6f}x is outside the {MIN_SHARE_RATIO:.2f}-{MAX_SHARE_RATIO:.2f}x share-ratio range chosen by this tool",
+            (
+                f"Share ratio {token_to_share_ratio:.4f} (token price ${token_price:,.2f} is "
+                f"{token_to_share_ratio:.4f}x the ${reference_price:,.2f} per-share reference, as the ratio predicts); "
+                f"ratios outside {MIN_SHARE_RATIO:.2f}-{MAX_SHARE_RATIO:.2f}x are not supported by this tool, "
+                f"because quoted amounts for them have not been checked against a live trade"
+            ),
         )
 
     expected_ref = token_price / token_to_share_ratio

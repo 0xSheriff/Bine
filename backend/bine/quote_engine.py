@@ -402,10 +402,11 @@ def evaluate_issuer_quote(
             qual_msg = f"{sample.token_symbol} has a reference price of ${sample.reference_price:.4f} (under the $1.00 minimum). Data is unreliable. Not buying."
         elif sample.token_to_share_ratio is not None and (sample.token_to_share_ratio < 0.25 or sample.token_to_share_ratio > 5.0):
             qual_msg = (
-                f"{sample.token_symbol} has a share ratio of {sample.token_to_share_ratio:.4f} shares per token, "
-                f"outside the 0.25-5.00x share-ratio range chosen by this tool "
-                f"(quoted price ${(sample.token_price or 0):,.2f} is consistent with the ${(sample.reference_price or 0):,.2f} reference). "
-                f"Not buying."
+                f"{sample.token_symbol} has a share ratio of {sample.token_to_share_ratio:.4f}. "
+                f"Its token price ${(sample.token_price or 0):,.2f} is {sample.token_to_share_ratio:.4f}x "
+                f"the ${(sample.reference_price or 0):,.2f} per-share reference, as the ratio predicts. "
+                f"Ratios outside 0.25-5.00x are not supported by this tool, because quoted amounts for them "
+                f"have not been checked against a live trade. Not buying."
             )
         elif sample.volume_24h is None or sample.volume_24h < 1_000_000:
             qual_msg = f"{sample.token_symbol} has only ${(sample.volume_24h or 0):,.0f} in 24-hour volume (under the $1M minimum). Too illiquid. Not buying."
@@ -416,16 +417,33 @@ def evaluate_issuer_quote(
     checks.append(RefusalCheck(rule="quality_unreliable", triggered=unreliable, detail=qual_msg))
 
     # Rule 3: market_closed
+    quote_err_str = ev.quote_error or ""
+    is_40367_or_40369 = (
+        "40367" in quote_err_str
+        or "40369" in quote_err_str
+        or "non-trading session" in quote_err_str.lower()
+    )
     market_closed = (
-        sample.open_state is not True
+        is_40367_or_40369
+        or sample.open_state is not True
         or (sample.reason_code is not None and sample.reason_code != "TRADING")
         or sample.market_status in ("paused", "closed")
     )
-    market_msg = (
-        f"{short_issuer} trading for {sample.token_symbol} is currently {sample.market_status or 'closed'} ({sample.reason_code or 'session paused'}). Not buying while the session is paused or closed."
-        if market_closed
-        else f"Trading is open on {short_issuer} ({sample.market_status or '24/7 DEX'})."
-    )
+    if market_closed:
+        if is_40367_or_40369:
+            session_label = sample.market_status or sample.reason_code or "closed"
+            open_note = ""
+            if "Expected to open in " in quote_err_str:
+                open_part = quote_err_str.split("Expected to open in ", 1)[1].strip().rstrip(".")
+                if open_part:
+                    open_note = f" Expected to open in {open_part}."
+            market_msg = f"{sample.token_symbol} is in a non-trading session ({session_label}).{open_note} Not buying."
+        else:
+            market_msg = (
+                f"{short_issuer} trading for {sample.token_symbol} is currently {sample.market_status or 'closed'} ({sample.reason_code or 'session paused'}). Not buying while the session is paused or closed."
+            )
+    else:
+        market_msg = f"Trading is open on {short_issuer} ({sample.market_status or '24/7 DEX'})."
     checks.append(RefusalCheck(rule="market_closed", triggered=market_closed, detail=market_msg))
 
     # Rule 4: reference_stale
@@ -456,6 +474,8 @@ def evaluate_issuer_quote(
     depth_thin = False
     if below_min:
         depth_detail = min_msg
+    elif market_closed and not ev.quote_ok:
+        depth_detail = market_msg
     elif not ev.quote_ok:
         depth_thin = True
         depth_detail = f"No pool on BNB Chain can fill ${amount_usd:,.2f} of {sample.token_symbol} right now. Not buying."
@@ -484,8 +504,15 @@ def evaluate_issuer_quote(
         if exec_spread is not None and abs(exec_spread) >= abs(ev.price_impact_pct or 0.0):
             abs_sp = abs(exec_spread)
             pct_str = f"{abs_sp:.0f}%" if abs_sp >= 5.0 else f"{abs_sp:.2f}%"
-            direction = "above" if exec_spread >= 0 else "below"
-            slip_detail = f"{short_issuer} would fill you about {pct_str} {direction} the market price (${ev.execution_price_per_share_usd:,.2f} vs ${sample.reference_price:,.2f} reference). Not buying."
+            if exec_spread < 0:
+                slip_detail = (
+                    f"{short_issuer} quote implies a fill about {pct_str} below the reference price "
+                    f"(${ev.execution_price_per_share_usd:,.2f} vs ${sample.reference_price:,.2f} reference). "
+                    f"Quotes this far in the buyer's favor usually point to a unit or pricing problem, "
+                    f"and this tool does not trust it. Not buying."
+                )
+            else:
+                slip_detail = f"{short_issuer} would fill you about {pct_str} above the market price (${ev.execution_price_per_share_usd:,.2f} vs ${sample.reference_price:,.2f} reference). Not buying."
         else:
             slip_detail = f"{short_issuer} has {slip_val:.2f}% price impact (over the {max_slippage_pct:.2f}% limit). Not buying."
     else:
@@ -500,7 +527,6 @@ def evaluate_issuer_quote(
         ev.refusal_reason = None
     else:
         by_rule = {c.rule: c for c in triggered}
-        quote_err_str = ev.quote_error or ""
         is_40374 = "40374" in quote_err_str or "insufficient liquidity" in quote_err_str.lower()
         is_quarantined = (
             (sample.token_price is not None and sample.token_price < 1.00)
@@ -512,6 +538,9 @@ def evaluate_issuer_quote(
         elif is_quarantined and "quality_unreliable" in by_rule:
             ev.refusal_code = "quality_unreliable"
             ev.refusal_reason = by_rule["quality_unreliable"].detail
+        elif is_40367_or_40369 and "market_closed" in by_rule:
+            ev.refusal_code = "market_closed"
+            ev.refusal_reason = by_rule["market_closed"].detail
         elif "depth_thin" in by_rule and (is_40374 or not ev.quote_ok or "quality_unreliable" not in by_rule):
             ev.refusal_code = "depth_thin"
             ev.refusal_reason = by_rule["depth_thin"].detail

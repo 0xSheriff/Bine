@@ -34,8 +34,8 @@ export default function Refusals() {
     {
       key: 'ratio',
       label: ratioEx
-        ? `${ratioEx.ticker} (${ratioEx.symbol}) at $5.50, Outside the 0.25-5.00x share-ratio range chosen by this tool (ratio ${ratioEx.token_to_share_ratio}x, quoted price consistent with reference)`
-        : 'Outside the 0.25-5.00x share-ratio range chosen by this tool (quoted price consistent with reference)',
+        ? `${ratioEx.ticker} (${ratioEx.symbol}) at $5.50, Share ratio ${ratioEx.token_to_share_ratio}x (ratios outside 0.25-5.00x are not supported by this tool)`
+        : 'Share ratio outside 0.25-5.00x (not supported by this tool)',
       ticker: ratioEx?.ticker || 'KLAC',
       amount: 5.5,
     },

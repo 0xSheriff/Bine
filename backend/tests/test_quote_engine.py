@@ -267,7 +267,7 @@ def test_refusal_rule_quality_unreliable(
 ) -> None:
     """Refuses with a single reason:
       1. Quarantined sub-$1.00 token (e.g. ENLVon at $0.0017) -> quality_unreliable with only quarantine text (even if quote fails).
-      2. Out-of-range share ratio (outside 0.25-5.00x) with valid quote -> quality_unreliable stating the ratio range and price consistency.
+      2. Out-of-range share ratio (outside 0.25-5.00x) with valid quote -> quality_unreliable stating the ratio, token price vs reference, and why ratios outside 0.25-5.00x are not supported.
       3. Non-quarantined token whose quote fails with [40374] -> depth_thin with only the liquidity reason.
     """
     now = datetime.now(timezone.utc)
@@ -312,10 +312,10 @@ def test_refusal_rule_quality_unreliable(
     assert ev.eligible is False
     assert ev.refusal_code == "quality_unreliable"
     assert ev.refusal_reason == (
-        "ENLVon has a share ratio of 0.0667 shares per token, "
-        "outside the 0.25-5.00x share-ratio range chosen by this tool "
-        "(quoted price $1.07 is consistent with the $16.05 reference). "
-        "Not buying."
+        "ENLVon has a share ratio of 0.0667. "
+        "Its token price $1.07 is 0.0667x the $16.05 per-share reference, as the ratio predicts. "
+        "Ratios outside 0.25-5.00x are not supported by this tool, because quoted amounts for them "
+        "have not been checked against a live trade. Not buying."
     )
 
     # Case 3: Non-quarantined token whose /quote fails with [40374] -> depth_thin with only the liquidity reason
@@ -349,7 +349,8 @@ def test_refusal_rule_market_closed(
     nvda_ondo_liq_fixture: dict,
     nvda_bstock_liq_fixture: dict,
 ) -> None:
-    """Refuses an issuer with code market_closed when open_state is False or reason_code != 'TRADING'."""
+    """Refuses an issuer with code market_closed when open_state is False, reason_code != 'TRADING',
+    or when /quote returns [40367]/[40369] non-trading session error."""
     now = datetime.now(timezone.utc)
     ondo_sample, bstock_sample = _make_nvda_samples(now)
 
@@ -382,6 +383,30 @@ def test_refusal_rule_market_closed(
     assert d["token"]["issuer"] == "bstock"
     assert d["alternative"]["eligible"] is False
     assert "paused" in d["alternative"]["note"]
+
+    # Case B: Single-issuer token (e.g. AAONon) failing /quote with [40367] non-trading session
+    aaon_sample = copy.deepcopy(ondo_sample)
+    aaon_sample.underlying_ticker = "AAON"
+    aaon_sample.token_symbol = "AAONon"
+    aaon_sample.open_state = False
+    aaon_sample.market_status = "postmarket"
+    aaon_sample.reason_code = "UNSUPPORTED"
+    ev_aaon = evaluate_issuer_quote(
+        sample=aaon_sample,
+        amount_usd=5.50,
+        quote_response=None,
+        liquidity_response={"code": 0, "msg": "success", "data": []},
+        quote_error="[40367] Token  is currently in a non-trading session. Expected to open in 0d 8h 34m.",
+        now=now,
+    )
+    assert ev_aaon.eligible is False
+    assert ev_aaon.refusal_code == "market_closed"
+    assert ev_aaon.refusal_reason == "AAONon is in a non-trading session (postmarket). Expected to open in 0d 8h 34m. Not buying."
+    verdict_aaon = build_verdict("AAON", 5.50, [ev_aaon], now=now)
+    d_aaon = verdict_aaon.to_dict()
+    assert d_aaon["verdict"] == "REFUSE"
+    assert d_aaon["refusal"]["code"] == "market_closed"
+    assert d_aaon["refusal"]["message"] == "AAONon is in a non-trading session (postmarket). Expected to open in 0d 8h 34m. Not buying."
 
 
 def test_refusal_rule_reference_stale(
@@ -449,10 +474,11 @@ def test_refusal_rule_slippage_too_high(
     nvda_ondo_liq_fixture: dict,
 ) -> None:
     """Refuses when quoted execution price deviates from reference price by > MAX_SLIPPAGE_PCT (1.0%),
-    such as SPYon at $250 (+40.7% spread above reference)."""
+    in both the above-reference direction (e.g. SPYon at $250) and the below-reference direction (e.g. NOWon at $5.50)."""
     now = datetime.now(timezone.utc)
     ondo_sample, _ = _make_nvda_samples(now)
 
+    # Direction 1: Above reference (positive deviation)
     bad_quote = copy.deepcopy(nvda_ondo_quote_fixture)
     orig_wei = int(bad_quote["data"][0]["toTokenAmount"])
     bad_quote["data"][0]["toTokenAmount"] = str(int(orig_wei * 0.70))
@@ -470,6 +496,34 @@ def test_refusal_rule_slippage_too_high(
     assert ev.price_impact_pct == pytest.approx(29.7429, abs=0.01)
     assert (ev.effective_slippage_pct or 0) > MAX_SLIPPAGE_PCT
     assert "above the market price" in (ev.refusal_reason or "")
+
+    # Direction 2: Below reference (negative deviation, e.g. NOWon 5x ratio where quote implies ~80% below reference)
+    now_sample = copy.deepcopy(ondo_sample)
+    now_sample.underlying_ticker = "NOW"
+    now_sample.token_symbol = "NOWon"
+    now_sample.token_price = 3402.431825
+    now_sample.reference_price = 680.486365
+    now_sample.token_to_share_ratio = 5.0
+    now_quote = copy.deepcopy(nvda_ondo_quote_fixture)
+    now_quote["data"][0]["fromTokenAmount"] = "5500000000000000000"
+    now_quote["data"][0]["toTokenAmount"] = "8074315104168432"
+    now_quote["data"][0]["priceImpactPercent"] = "0.0"
+
+    ev_below = evaluate_issuer_quote(
+        sample=now_sample,
+        amount_usd=5.50,
+        quote_response=now_quote,
+        liquidity_response=nvda_ondo_liq_fixture,
+        now=now,
+    )
+    assert ev_below.eligible is False
+    assert ev_below.refusal_code == "slippage_too_high"
+    assert ev_below.refusal_reason == (
+        "Ondo quote implies a fill about 80% below the reference price "
+        "($136.23 vs $680.49 reference). "
+        "Quotes this far in the buyer's favor usually point to a unit or pricing problem, "
+        "and this tool does not trust it. Not buying."
+    )
 
 
 def test_refusal_rule_unknown_ticker() -> None:

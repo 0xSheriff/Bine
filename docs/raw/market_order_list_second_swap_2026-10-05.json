@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "data": {
+    "total": 2,
+    "page": 1,
+    "pageSize": 20,
+    "list": [
+      {
+        "orderType": "market",
+        "orderId": "26100500001942767719",
+        "chain": "56",
+        "fromToken": "0x55d398326f99059fF775485246999027B3197955",
+        "fromTokenName": "USDT",
+        "fromTokenQty": "2.000000000000000000",
+        "toToken": "0x02Fca66C1D1aFB4E2A7884261eB00F63598a7436",
+        "toTokenName": "NVDAB",
+        "toTokenActualQty": "0.008427629564723702",
+        "status": "FINISHED",
+        "slippage": "0.5000",
+        "txHash": "0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75",
+        "bookTime": "2026-10-05T16:05:34+01:00",
+        "updatedTime": "2026-10-05T16:05:35+01:00"
+      },
+      {
+        "orderType": "market",
+        "orderId": "26100300001937918737",
+        "chain": "56",
+        "fromToken": "0x55d398326f99059fF775485246999027B3197955",
+        "fromTokenName": "USDT",
+        "fromTokenQty": "2.000000000000000000",
+        "toToken": "0x02Fca66C1D1aFB4E2A7884261eB00F63598a7436",
+        "toTokenName": "NVDAB",
+        "toTokenActualQty": "0.00851201289192116",
+        "status": "FINISHED",
+        "slippage": "0.5000",
+        "txHash": "0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506",
+        "bookTime": "2026-10-03T22:18:17+01:00",
+        "updatedTime": "2026-10-03T22:18:18+01:00"
+      }
+    ]
+  }
+}

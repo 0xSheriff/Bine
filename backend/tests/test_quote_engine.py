@@ -289,6 +289,39 @@ def test_refusal_rule_quality_unreliable(
         "outside the supported 0.25–5.00x limit — not buying."
     )
 
+    # When /quote fails with 40374 (Insufficient liquidity), depth_thin is reported first
+    # and the share-ratio note is included as a second line:
+    klac_sample = copy.deepcopy(ondo_sample)
+    klac_sample.token_symbol = "KLACon"
+    klac_sample.underlying_ticker = "KLAC"
+    klac_sample.token_price = 17121.02
+    klac_sample.reference_price = 1700.54
+    klac_sample.token_to_share_ratio = 10.068018
+    ev_klac = evaluate_issuer_quote(
+        sample=klac_sample,
+        amount_usd=25.0,
+        quote_response=None,
+        liquidity_response={"code": 0, "msg": "success", "data": []},
+        quote_error="[40374] Insufficient liquidity for a quote. Please decrease the transaction amount or try again later.",
+        now=now,
+    )
+    assert ev_klac.eligible is False
+    assert ev_klac.refusal_code == "depth_thin"
+    assert ev_klac.refusal_reason == (
+        "No pool on BNB Chain can fill $25.00 of KLACon right now. Not buying.\n"
+        "KLACon has a share ratio of 10.0680 shares per token "
+        "(token price $17,121.02 vs $1,700.54 reference), "
+        "outside the supported 0.25–5.00x limit — not buying."
+    )
+    verdict_klac = build_verdict("KLAC", 25.0, [ev_klac], now=now)
+    d_klac = verdict_klac.to_dict()
+    assert d_klac["verdict"] == "REFUSE"
+    assert d_klac["refusal"]["code"] == "depth_thin"
+    assert d_klac["refusal"]["message"].splitlines() == [
+        "No pool on BNB Chain can fill $25.00 of KLACon right now. Not buying.",
+        "KLACon has a share ratio of 10.0680 shares per token (token price $17,121.02 vs $1,700.54 reference), outside the supported 0.25–5.00x limit — not buying.",
+    ]
+
 
 def test_refusal_rule_market_closed(
     nvda_ondo_quote_fixture: dict,

@@ -94,9 +94,18 @@ Raw chronological list of verified technical observations, endpoints, timestamps
 
 13. **`baw wallet balance` vs. On-Chain `eth_call` `balanceOf` Share-Ratio Gap**
     - **Observation**:
-      - `baw wallet balance --binanceChainId 56 --json` (and `toTokenActualQty` in `baw market-order list --json`) shows `0.00851201289192116` `NVDAB`.
-      - On-chain `eth_call` `balanceOf(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730)` on `0x02fca66c1d1afb4e2a7884261eb00f63598a7436` returns `8505393792444895` wei (`0.008505393792444894` raw tokens, or `0.0085053938` rounded).
+      - `baw wallet balance --binanceChainId 56 --json` (and `toTokenActualQty` in `baw market-order list --json`) shows `0.00851201289192116` `NVDAB` after swap 1 and `0.016939642456644862` `NVDAB` after swap 2.
+      - On-chain `eth_call` `balanceOf(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730)` on `0x02fca66c1d1afb4e2a7884261eb00f63598a7436` returns `8505393792444895` wei (`0.008505393792444894` raw tokens, or `0.0085053938` rounded) after swap 1 and `16926469875736378` wei (`0.016926469875736379` raw tokens) after swap 2.
       - The gap equals `tokenToShareRatio` `1.0007782237528078`:
-        `0.008505393792444894 * 1.0007782237528078 = 0.00851201289192116`.
+        - Swap 1: `0.008505393792444894 * 1.0007782237528078 = 0.00851201289192116`
+        - Swap 2: `0.016926469875736379 * 1.0007782237528078 = 0.016939642456644862` (`0.016939642456644862 / 1.0007782237528078 = 0.016926469875736379`).
       - Compared against Bine's pre-swap quote (`0.00850550` raw tokens / `0.00851212` shares), the on-chain fill is within `-0.12 bps` (`-0.13 bps` in shares), and `-4.7 bps` against the earlier `0.008516` off-hours quote.
+
+14. **US Regular-Hours Quotes (`marketStatus = "regular"`, 94 Minutes After Open / 11:04 New York) & Second `$2.00` `NVDAB` Swap (`0xa3693383...3e75`)**
+    - **UTC Timestamp**: `2026-10-05T15:04:08Z–15:05:40Z` (`11:04` New York, 94 minutes after the 09:30 New York open)
+    - **Observation**:
+      - **Regular-hours Ondo RFQ/mint routing vs. off-hours AMM fallback (`docs/raw/regular_hours_quotes_2026-10-05.jsonl`)**: During US regular trading hours (`marketStatus = "regular"`), `NVDAon`, `SPYon`, `NFLXon` (`10.0000x` ratio), `CVNAon` (`4.9970x` ratio), and `NOWon` (`4.9964x` ratio) all route through `vendorName = "Ondo RWA"` (`dexName = "SWAP"`) at **`+0.0036%` to `+0.0038%` (`~0.37 bps`)** above reference price (`$237.3188` vs `$237.31` on `NVDAon`; `$777.0888` vs `$777.06` on `SPYon`). By contrast, `KLACon` (`10.0680x` ratio) and `PPLTon` (`10.0000x` ratio) still return `[40374] Insufficient liquidity for a quote. Please decrease the transaction amount or try again later.`
+      - **Second live `$2.00` `NVDAB` swap (`docs/live_swap_nvda_2usd_second_2026-10-05.json`, `DecisionLog #17` & `#18`)**:
+        - Executed `bine buy NVDA 2 --yes` with zero hand edits. `DecisionLog #17` (`action="dry_run"`, `execution_status="DRY_RUN_OK"`, `order_id=null`) logged the automatic pre-trade dry-run; `DecisionLog #18` (`action="execute"`, `execution_status="LIVE_SUBMITTED"`, `order_id="26100500001942767719"`, `tx_hash="0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75"`, BSC Block `125889084`, `gasUsed = 325,602`, `effectiveGasPrice = 101,149,809`, `fee = 0.000032934580110018 BNB`) logged the live swap.
+        - **On-chain USDT allowance comparison**: `allowance(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730, 0xb300000b72DEAEb607a12d5f54773D1C19c7028d)` is `0xffffffffffffffffffffffffffffffffffffffffffffffffc87d2531626fffff` (`115792089237316195423570985008687907853269984665640564039453584007913129639935` wei = `uint256.max - 4e18`), whereas `allowance(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730, 0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5)` is `0`. Therefore, the second swap required no `approve` tx and returned a single direct `orderId` (`26100500001942767719`) on the first poll.
 

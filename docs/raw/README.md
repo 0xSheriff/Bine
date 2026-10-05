@@ -12,6 +12,11 @@
 | `tx_history_post_swap.json` | **Transcribed/summarized from the Oct 3 log** | Written on `2026-10-04T05:48` as a flat summary (`data.list`) rather than the nested `data.transactions[].txHashList` structure returned by `wallet tx-history`. Replaced for raw reference by `tx_history_2026-10-05.json` below. |
 | `market_order_list_2026-10-05.json` | **Captured live / re-queried today (`2026-10-05`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 market-order list --json` on `2026-10-05T02:40Z`. |
 | `tx_history_2026-10-05.json` | **Captured live / re-queried today (`2026-10-05`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 wallet tx-history --binanceChainId 56 --json` on `2026-10-05T02:40Z`. |
+| `rwa_tokens_no_key_2026-10-05.txt` | **Captured live (`2026-10-05`)** | Raw HTTP status, `Location` header, and response body for keyless `GET /api/v1/dex/market/rwa/tokens` (`HTTP 401`, `code: 40101`) and `GET /rwa/tokens` (`HTTP 302`). |
+| `regular_hours_quotes_2026-10-05.jsonl` | **Captured live (`2026-10-05T15:04Z`)** | 18 live quotes across `NVDAB`, `NVDAon`, `SPYB`, `SPYon`, `KLACon`, `NFLXon`, `PPLTon`, `CVNAon`, and `NOWon` at `$5.50` and `$25.00` during US regular trading hours (`marketStatus = "regular"`, 94 minutes after open / `11:04` New York). |
+| `wallet_balance_second_swap_2026-10-05.json` | **Captured live (`2026-10-05T15:05Z`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 wallet balance --binanceChainId 56 --json` immediately after the second `$2.00` `NVDAB` swap (`0.016939642456644862 NVDAB`, `1.00 USDT`). |
+| `market_order_list_second_swap_2026-10-05.json` | **Captured live (`2026-10-05T15:05Z`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 market-order list --json` showing both finished `$2.00` `NVDAB` orders (`26100500001942767719` and `26100300001937918737`). |
+| `tx_history_second_swap_2026-10-05.json` | **Captured live (`2026-10-05T15:05Z`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 wallet tx-history --binanceChainId 56 --json` showing today's swap (`0xa3693383...3e75`) and the Oct 3 swap + approve transactions. |
 
 ---
 

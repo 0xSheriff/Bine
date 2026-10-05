@@ -494,8 +494,25 @@ def evaluate_issuer_quote(
     ev.checks = checks
     triggered = [c for c in checks if c.triggered]
     ev.eligible = not bool(triggered)
-    ev.refusal_code = triggered[0].rule if triggered else None
-    ev.refusal_reason = triggered[0].detail if triggered else None
+    if not triggered:
+        ev.refusal_code = None
+        ev.refusal_reason = None
+    else:
+        by_rule = {c.rule: c for c in triggered}
+        quote_err_str = ev.quote_error or ""
+        is_40374 = "40374" in quote_err_str or "insufficient liquidity" in quote_err_str.lower()
+        if "amount_over_cap" in by_rule:
+            ev.refusal_code = "amount_over_cap"
+            ev.refusal_reason = by_rule["amount_over_cap"].detail
+        elif "depth_thin" in by_rule and (is_40374 or not ev.quote_ok or "quality_unreliable" not in by_rule):
+            ev.refusal_code = "depth_thin"
+            if "quality_unreliable" in by_rule:
+                ev.refusal_reason = f"{by_rule['depth_thin'].detail}\n{by_rule['quality_unreliable'].detail}"
+            else:
+                ev.refusal_reason = by_rule["depth_thin"].detail
+        else:
+            ev.refusal_code = triggered[0].rule
+            ev.refusal_reason = triggered[0].detail
     return ev
 
 
@@ -546,8 +563,8 @@ def build_verdict(
 
     if not eligible:
         refusal_priority = {
-            "amount_over_cap": 0, "quality_unreliable": 1, "market_closed": 2, "reference_stale": 3,
-            "slippage_too_high": 4, "depth_thin": 5, "below_issuer_minimum": 6,
+            "amount_over_cap": 0, "depth_thin": 1, "quality_unreliable": 2, "market_closed": 3,
+            "reference_stale": 4, "slippage_too_high": 5, "below_issuer_minimum": 6,
         }
         ordered_bad = sorted(evaluations, key=lambda e: (refusal_priority.get(e.refusal_code or "", 99), _deterministic_tiebreak_key(e)))
         primary = ordered_bad[0]

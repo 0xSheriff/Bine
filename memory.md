@@ -64,7 +64,7 @@
 - **2026-10-02 (Item 8 — Final Judge Test Re-Score)**:
   - Re-scored all 12 categories with concrete file/test/screenshot/command evidence (`11/12` categories passing at `9/10–10/10`; `Live On-Chain Execution` explicitly marked `0/10 (UNVERIFIED)` until the user runs the live `$2`/`$5` swap commands).
 - **2026-10-03 (Item A.1 — Standalone Git Repo & Staged Secret Scan)**:
-  - Ran `git rev-parse --show-toplevel` (which previously returned `/Users/mac`), initialized a dedicated git repository inside `/Users/mac/Bine` (`git init`), confirmed `git check-ignore -v .env` -> `.gitignore:1:.env	.env`, scanned all staged files for `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` (`staged_key_matches=0`, `staged_secret_matches=0`), and created root commit `1a6e1d1`.
+  - Initialized a dedicated git repository inside the project root (`git init`), confirmed `git check-ignore -v .env` -> `.gitignore:1:.env	.env`, scanned all staged files for `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` (`staged_key_matches=0`, `staged_secret_matches=0`), and created root commit `1a6e1d1`.
 - **2026-10-03 (Item A.2 — `baw` Command Flags & `npx` Fallback)**:
   - Verified `npx --yes @binance/agentic-wallet@1.10.0 market-order swap --help`: uses `--fromTokenQty`, `--fromToken`, `--toToken`, `--binanceChainId 56`, `--slippage` (`"auto"` or `0–100` percentage points, e.g. `0.5` = `0.5%`), `--mev true`, `--gasLevel MEDIUM`, `--json`.
   - Updated `run_agentic_wallet_swap()` in `backend/bine/execution.py` to fall back to `npx --yes @binance/agentic-wallet@1.10.0` when `baw` is not installed globally on `PATH`.
@@ -91,11 +91,11 @@
   - Verified Agentic Wallet (`0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730` on BSC `56`) balance (`5.00 USDT`, `0.00025936 BNB`), ran and saved the Transaction API dry-run (`docs/dry_run_nvda_2usd.json`), and executed the `$2.00` `NVDAB` live swap (`docs/live_swap_nvda_2usd.json`, `Decision #16`).
   - Confirmed on-chain (`txHash: 0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`, approve `txHash: 0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`, total gas `0.00005091 BNB` $\approx \$0.040$): `0.00851201289192116` `NVDAB` shares (`8505393792444895` wei = `0.008505393792444894` raw `NVDAB` tokens * `1.0007782237528078` `tokenToShareRatio`) landed at `0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730` (`-0.13 bps` vs immediate `0.00851212` quote, `-4.7 bps` vs earlier `0.008516` quote).
   - Discovered and fixed parent-vs-child `orderId` split on `approve` + `swap` in `run_agentic_wallet_swap()` (`swap` returned parent `orderId: 26100300001937918699` while `market-order list` recorded child `orderId: 26100300001937918737`).
-- **2026-10-05 (Asset Cleanup, `docs/screenshots/`, `AuthError` `HTTP 503`, Share-Ratio Limit Copy & Router Provenance)**:
+- **2026-10-05 (Asset Cleanup, `docs/screenshots/`, `AuthError` `HTTP 503`, Share-Ratio Limit Copy, Regular-Hours Quotes & Second `$2.00` `NVDAB` Swap)**:
   - Removed unused `frontend/src/assets/hero.png`, `react.svg`, `vite.svg`, and `docs/schema.json` via `git rm`; copied the 12 README screenshots into `docs/screenshots/` and updated `README.md` links.
   - Added `AuthError` (`backend/bine/errors.py`, `backend/bine/client.py`, `backend/bine/app.py`, `backend/bine/cli.py`, `50/50` pytest tests passing) so missing or rejected Binance API keys (`40101`, `40102`, `HTTP 302/401/403`, or non-JSON response) return `HTTP 503` (`{"detail": "Binance API keys missing or rejected"}`) on `/api/quote` and print a single line with exit code `1` in `bine`. Saved keyless response evidence in `docs/raw/rwa_tokens_no_key_2026-10-05.txt`.
-  - Updated share-ratio refusal copy in `backend/bine/quality.py`, `backend/bine/quote_engine.py`, and `frontend/src/pages/Refusals.tsx` to state the ratio and the supported `0.25–5.00x` limit instead of calling the data unreliable.
-  - Documented in `README.md` and `docs/optional-hosting.md` that `/pre-transaction/simulate` dry-runs target the DEX aggregator router (`0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5`) while `baw market-order swap` executes through `baw`'s router contract (`0xb300000b72DEAEb607a12d5f54773D1C19c7028d`), and that `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` is a placeholder public address used only for quotes.
+  - Updated share-ratio refusal copy in `backend/bine/quality.py`, `backend/bine/quote_engine.py`, and `frontend/src/pages/Refusals.tsx` to state the ratio and the supported `0.25–5.00x` limit instead of calling the data unreliable, and prioritized `depth_thin` first when `/api/v1/dex/aggregator/quote` fails with `40374` (`Insufficient liquidity`) with the share-ratio note included on a second line.
+  - Ran the US regular-hours quote matrix (`2026-10-05T15:04Z`, `marketStatus = "regular"`, 94 minutes after open / `11:04` New York, saved to `docs/raw/regular_hours_quotes_2026-10-05.jsonl`) and executed the second live `$2.00` `NVDAB` swap (`bine buy NVDA 2 --yes`) with zero hand edits (`DecisionLog #17` dry-run + `DecisionLog #18` live execution, `orderId: 26100500001942767719`, `txHash: 0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75`, BSC Block `125889084`, `docs/live_swap_nvda_2usd_second_2026-10-05.json`).
 
 ## 6. Important Decisions
 - **5 bps Tie Band (`"Either works"`)**: When both issuers are eligible and within 5 bps on all-in price per share, Bine does not claim a price winner; it says `"Either works"` and picks deterministically (deeper AMM liquidity first → lower minimum order → alphabetical).
@@ -104,11 +104,11 @@
 
 ## 7. Known Issues & Domain Quirks
 - **Ondo `$5` Minimum Order (`[40375]`)**: Ondo rejects orders under `$5.00` (and `$5.00` exact lands under `$5` after conversion; `$5.05+` succeeds), while `bStocks` executes down to `$2.00`. Default order amount is `$5.50` and `BINE_MAX_TRADE_USD=6.00` so both issuers are executable.
-- **`SPYon` Reproducible `+40.75%`–`+82.07%` Spread at `$250`**: `SPYon` executes near reference at `$25` and `$100`, then jumps to `+40.75%`–`+82.07%` above reference at `$250` across all runs. Caught deterministically by `slippage_too_high`.
+- **`SPYon` Reproducible `+40.75%`–`+82.07%` Spread at `$250` Off-Hours vs. `+0.0037%` Regular Hours**: Off-hours, `SPYon` executes near reference at `$25` and `$100` on `PancakeSwap V3`, then jumps to `+40.75%`–`+82.07%` above reference at `$250` across all runs (caught deterministically by `slippage_too_high`). During US regular trading hours (`marketStatus = "regular"`), `SPYon` routes through `Ondo RWA` at `+0.0037%` (`+0.37 bps`).
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed all items including the live `$2.00` `NVDAB` swap (`txHash: 0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`), on-chain verification, and local `BINE_API_URL=http://localhost:8000` default.
+- Completed all items including both live `$2.00` `NVDAB` swaps (`0x00c0fabd...e506` off-hours and `0xa3693383...3e75` during US regular hours, 94 minutes after open / `11:04` New York), on-chain allowance & balance verification, and `depth_thin`-first refusal priority.
 
 ## 9. Next Steps
 1. Ready for final submission (optional single-service hosting notes in `docs/optional-hosting.md`).
@@ -121,7 +121,8 @@
 - `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
 - `docs/optional-hosting.md` — Optional single-service hosting guide (Phase 2).
 - `docs/dry_run_nvda_2usd.json` — Saved Transaction API dry-run output before live swap.
-- `docs/live_swap_nvda_2usd.json` — Saved `$2.00` `NVDAB` live swap receipt (`Decision #16`).
+- `docs/live_swap_nvda_2usd.json` — Saved first `$2.00` `NVDAB` live swap receipt (`Decision #16`).
+- `docs/live_swap_nvda_2usd_second_2026-10-05.json` — Saved second `$2.00` `NVDAB` live swap receipt (`Decision #18`, zero hand edits).
 - `tools/collect_evidence.py` — Standalone evidence sampler utility.
 - `backend/bine/client.py` — `BinanceClient` + `maybe_enable_dev_dns_fallback`.
 - `backend/bine/quality.py` — Data-quality filter (`assess_token_quality`, `MAX_SHARE_RATIO = 5.0`).

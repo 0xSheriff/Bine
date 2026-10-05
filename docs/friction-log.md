@@ -214,3 +214,27 @@ All entries are factual. Timestamps are UTC.
     - By contrast, `allowance(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730, 0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5)` on the Open API `LiquidMesh` router is `0`, so `/api/v1/dex/pre-transaction/simulate` continues to report `REQUIRES_APPROVAL` on `0xB44446b0...`.
     - Because `0xb300000b...028d` already had `uint256.max` allowance, `baw market-order swap` submitted a single swap order (`26100500001942767719`) with no parent/child split, and `--orderId 26100500001942767719` returned `"status": "FINISHED"` with `txHash` on the first poll.
 
+## 2026-10-05T21:25Z — Developer-Experience Finding: Open API Simulation Spender (`0xB44446b0...`) vs. `baw` Execution Router (`0xb300000b...`) and `tx-history` Approve Amount
+
+- **Endpoints & Doc Pages**:
+  - `GET /build/api/v1/dex/aggregator/quote` (`data[].approveTarget`)
+  - `GET /build/api/v1/dex/aggregator/swap` (`data.tx.to`)
+  - `GET /build/api/v1/dex/aggregator/approve-transaction` (`data[].dexContractAddress`, documented at `https://web3.binance.com/en/dev-docs/llms-full.txt` under Trading API / Get Approve Transaction)
+  - `POST /build/api/v1/dex/pre-transaction/simulate` (`data.status`, `data.failReason`, `data.allowanceChanges[].spender`, documented at `https://web3.binance.com/en/dev-docs/llms-full.txt` under Transaction API / Simulate Transaction)
+  - `@binance/agentic-wallet@1.10.0` (`baw market-order swap` and `baw wallet tx-history --binanceChainId 56 --json`)
+- **What `POST /api/v1/dex/pre-transaction/simulate` reported & which spender it used**:
+  - Simulating the calldata from `GET /api/v1/dex/aggregator/swap` (`data.tx.to = "0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5"`) returned `status: "FAILED"`, `failReason: "execution reverted: BEP20: transfer amount exceeds allowance"`.
+  - `GET /api/v1/dex/aggregator/approve-transaction` returned `dexContractAddress: "0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5"`, and simulating that approval calldata returned `status: "SUCCESS"` with `allowanceChanges[0].spender = "0xb44446b0c8e56988c34f7ff73ae904982b5fdda5"`.
+- **What `baw` actually used**:
+  - Live execution via `baw market-order swap` executed on-chain against spender/router `0xb300000b72DEAEb607a12d5f54773D1C19c7028d` (`txHash: 0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506` on `2026-10-03T21:18:17Z` and `txHash: 0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75` on `2026-10-05T15:05:34Z`).
+  - The first swap's `approve` transaction (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`) granted `uint256.max` (`0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`) USDT allowance on-chain to `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`, leaving `115792089237316195423570985008687907853269984665640564039453584007913129639935` wei (`uint256.max - 4 * 10^18`) after the two `$2` swaps, while `allowance(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730, 0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5)` remained `0` (`docs/raw/usdt_allowance_2026-10-05.txt`).
+  - Meanwhile, `baw wallet tx-history --binanceChainId 56 --json` reported `instructions.approve.amount = "2000000000000000000"` (`2 USDT`) for `0x803cda03...eeb64` instead of the on-chain `uint256.max` approval value.
+- **What I expected**:
+  - Expected `GET /api/v1/dex/aggregator/swap` + `POST /api/v1/dex/pre-transaction/simulate` and `baw market-order swap` to use the same router/spender address (or for `/aggregator/swap` and `/aggregator/approve-transaction` to return `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`), so that after the first swap's approval, subsequent dry-runs would return `status: "SUCCESS"` rather than `BEP20: transfer amount exceeds allowance`. Also expected `baw wallet tx-history` `instructions.approve.amount` to report the actual on-chain `Approval` log value (`uint256.max`).
+- **How long it took to understand (from log timestamps)**:
+  - First live swap and dry-run logged at `2026-10-03T21:18:06Z–21:18:17Z`; second live swap (`DecisionLog #17` and `#18`) logged at `2026-10-05T15:05:27Z–15:05:40Z` (41 hours 47 minutes after the first swap); on-chain `eth_call` `allowance(owner, spender)` comparison across both spenders completed at `2026-10-05T21:25:35Z` (`6 hours 20 minutes` after `DecisionLog #17` at `15:05:27Z`, and `48 hours 07 minutes` elapsed since the first swap at `2026-10-03T21:18:17Z`).
+- **What I would change in the API**:
+  1. Align the router/spender returned by `GET /api/v1/dex/aggregator/quote` (`data[].approveTarget`), `GET /api/v1/dex/aggregator/swap` (`data.tx.to`), and `GET /api/v1/dex/aggregator/approve-transaction` (`data[].dexContractAddress`) with the router used by `baw market-order swap` (`0xb300000b72DEAEb607a12d5f54773D1C19c7028d`), or accept a router/channel parameter so `POST /api/v1/dex/pre-transaction/simulate` tests the exact router `baw` executes against.
+  2. Expose a `baw market-order swap --dry-run` flag in `@binance/agentic-wallet` that simulates the exact `place-order` transaction against `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`.
+  3. Fix `baw wallet tx-history` so `instructions.approve.amount` reflects the actual on-chain ERC-20 `Approval` event amount (`uint256.max`) rather than the swap's `fromTokenQty` (`2000000000000000000`).
+

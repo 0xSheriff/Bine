@@ -96,6 +96,7 @@
   - Added `AuthError` (`backend/bine/errors.py`, `backend/bine/client.py`, `backend/bine/app.py`, `backend/bine/cli.py`, `50/50` pytest tests passing) so missing or rejected Binance API keys (`40101`, `40102`, `HTTP 302/401/403`, or non-JSON response) return `HTTP 503` (`{"detail": "Binance API keys missing or rejected"}`) on `/api/quote` and print a single line with exit code `1` in `bine`. Saved keyless response evidence in `docs/raw/rwa_tokens_no_key_2026-10-05.txt`.
   - Updated share-ratio refusal copy in `backend/bine/quality.py`, `backend/bine/quote_engine.py`, and `frontend/src/pages/Refusals.tsx` to state the ratio and the supported `0.25–5.00x` limit instead of calling the data unreliable, and prioritized `depth_thin` first when `/api/v1/dex/aggregator/quote` fails with `40374` (`Insufficient liquidity`) with the share-ratio note included on a second line.
   - Ran the US regular-hours quote matrix (`2026-10-05T15:04Z`, `marketStatus = "regular"`, 94 minutes after open / `11:04` New York, saved to `docs/raw/regular_hours_quotes_2026-10-05.jsonl`) and executed the second live `$2.00` `NVDAB` swap (`bine buy NVDA 2 --yes`) with zero hand edits (`DecisionLog #17` dry-run + `DecisionLog #18` live execution, `orderId: 26100500001942767719`, `txHash: 0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75`, BSC Block `125889084`, `docs/live_swap_nvda_2usd_second_2026-10-05.json`).
+  - Verified on-chain USDT allowances (`docs/raw/usdt_allowance_2026-10-05.txt`): `allowance(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730, 0xb300000b72DEAEb607a12d5f54773D1C19c7028d)` is `uint256.max - 4 * 10^18` while `allowance(..., 0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5)` is `0`. Updated `run_transaction_dry_run()` in `backend/bine/execution.py` to check `allowance(wallet, 0xb300...)` via BSC RPC when a wallet address is configured (`51/51` pytest tests passing), and created `docs/devex-report-facts.md`.
 
 ## 6. Important Decisions
 - **5 bps Tie Band (`"Either works"`)**: When both issuers are eligible and within 5 bps on all-in price per share, Bine does not claim a price winner; it says `"Either works"` and picks deterministically (deeper AMM liquidity first → lower minimum order → alphabetical).
@@ -108,7 +109,7 @@
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed all items including both live `$2.00` `NVDAB` swaps (`0x00c0fabd...e506` off-hours and `0xa3693383...3e75` during US regular hours, 94 minutes after open / `11:04` New York), on-chain allowance & balance verification, and `depth_thin`-first refusal priority.
+- Completed all items including both live `$2.00` `NVDAB` swaps (`0x00c0fabd...e506` off-hours and `0xa3693383...3e75` during US regular hours, 94 minutes after open / `11:04` New York), on-chain allowance & balance verification, dry-run router/allowance summary update, and `docs/devex-report-facts.md`.
 
 ## 9. Next Steps
 1. Ready for final submission (optional single-service hosting notes in `docs/optional-hosting.md`).
@@ -119,6 +120,7 @@
 - `docs/PROJECT_BRIEF.md` — Original brief.
 - `docs/friction-log.md` — Empirical friction log with raw API measurements.
 - `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
+- `docs/devex-report-facts.md` — Concise bullet fact sheet of all DevEx findings.
 - `docs/optional-hosting.md` — Optional single-service hosting guide (Phase 2).
 - `docs/dry_run_nvda_2usd.json` — Saved Transaction API dry-run output before live swap.
 - `docs/live_swap_nvda_2usd.json` — Saved first `$2.00` `NVDAB` live swap receipt (`Decision #16`).

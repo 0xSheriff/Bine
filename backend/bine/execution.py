@@ -48,6 +48,74 @@ from bine.quote_engine import (
 )
 
 BSCTRACE_TX_URL_PREFIX = "https://bsctrace.com/tx/"
+BSC_PUBLIC_RPC_URL = "https://bsc-dataseed.binance.org"
+BAW_ROUTER_ADDRESS = "0xb300000b72DEAEb607a12d5f54773D1C19c7028d"
+SIMULATION_ROUTER_ADDRESS = "0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5"
+PLAIN_ROUTER_APPROVAL_SUMMARY = (
+    "Simulation passed. Simulation router 0xB444... has no USDT allowance; "
+    "live swaps via baw execute through router 0xb300...."
+)
+BAW_SUFFICIENT_ALLOWANCE_SUMMARY = (
+    "Simulation router 0xB444... has no allowance; baw router 0xb300... "
+    "already has sufficient allowance, so no approve tx is expected."
+)
+
+
+async def _query_usdt_allowance_wei(
+    owner_address: str,
+    spender_address: str = BAW_ROUTER_ADDRESS,
+    *,
+    rpc_url: str = BSC_PUBLIC_RPC_URL,
+) -> int | None:
+    """Query on-chain ERC-20 `allowance(owner, spender)` on BSC USDT via `eth_call`.
+    Returns `None` on any RPC or parsing error so RPC failures never block a quote or buy.
+    """
+    import httpx as _httpx
+
+    clean_owner = owner_address.strip()
+    clean_spender = spender_address.strip()
+    if not clean_owner.startswith("0x") or len(clean_owner) != 42:
+        return None
+    if not clean_spender.startswith("0x") or len(clean_spender) != 42:
+        return None
+    call_data = "0xdd62ed3e" + clean_owner[2:].lower().zfill(64) + clean_spender[2:].lower().zfill(64)
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_call",
+        "params": [{"to": USDT_BSC_ADDRESS, "data": call_data}, "latest"],
+    }
+    try:
+        async with _httpx.AsyncClient(timeout=3.0) as hc:
+            resp = await hc.post(rpc_url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+            result_hex = body.get("result")
+            if isinstance(result_hex, str) and result_hex.startswith("0x") and len(result_hex) > 2:
+                return int(result_hex, 16)
+    except Exception:
+        return None
+    return None
+
+
+async def _build_requires_approval_summary(
+    wallet_address: str | None,
+    amount_wei: str,
+) -> str:
+    """Return the human-readable dry-run summary when `/pre-transaction/simulate` reports
+    `REQUIRES_APPROVAL` on the aggregator router (`0xB444...`).
+    """
+    w = (wallet_address or "").strip()
+    if not w or w.lower() == DEFAULT_QUOTE_WALLET.lower():
+        return PLAIN_ROUTER_APPROVAL_SUMMARY
+    try:
+        needed_wei = max(1, int(amount_wei))
+    except ValueError:
+        needed_wei = 1
+    allowance_wei = await _query_usdt_allowance_wei(w, BAW_ROUTER_ADDRESS)
+    if allowance_wei is not None and allowance_wei >= needed_wei:
+        return BAW_SUFFICIENT_ALLOWANCE_SUMMARY
+    return PLAIN_ROUTER_APPROVAL_SUMMARY
 
 
 @dataclass
@@ -258,7 +326,7 @@ async def run_transaction_dry_run(
                 if app_status == "SUCCESS":
                     res.passed = True
                     res.status = "REQUIRES_APPROVAL"
-                    res.summary = "Simulation passed. One-time USDT approval needed."
+                    res.summary = await _build_requires_approval_summary(wallet_address, amount_wei)
                     return res
         except Exception as exc:
             res.approval_simulation_status = f"ERROR: {type(exc).__name__}"

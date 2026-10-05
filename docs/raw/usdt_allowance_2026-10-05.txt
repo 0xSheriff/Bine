@@ -1,0 +1,18 @@
+# Queried live against https://bsc-dataseed.binance.org on 2026-10-05
+# USDT BSC contract: 0x55d398326f99059fF775485246999027B3197955
+# Owner wallet: 0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730
+
+=== 1. baw router: 0xb300000b72DEAEb607a12d5f54773D1C19c7028d ===
+Request POST https://bsc-dataseed.binance.org:
+{"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [{"to": "0x55d398326f99059fF775485246999027B3197955", "data": "0xdd62ed3e00000000000000000000000034daabcaba08a9365c229e2ac7b25c14c6a6b730000000000000000000000000b300000b72deaeb607a12d5f54773d1c19c7028d"}, "latest"]}
+Raw response:
+{"jsonrpc":"2.0","id":1,"result":"0xffffffffffffffffffffffffffffffffffffffffffffffffc87d2531626fffff"}
+Decimal wei: 115792089237316195423570985008687907853269984665640564039453584007913129639935
+uint256.max - allowance: 4000000000000000000 wei (4 * 10^18)
+
+=== 2. Open API /aggregator/swap simulation router (LiquidMesh): 0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5 ===
+Request POST https://bsc-dataseed.binance.org:
+{"jsonrpc": "2.0", "id": 2, "method": "eth_call", "params": [{"to": "0x55d398326f99059fF775485246999027B3197955", "data": "0xdd62ed3e00000000000000000000000034daabcaba08a9365c229e2ac7b25c14c6a6b730000000000000000000000000b44446b0c8e56988c34f7ff73ae904982b5fdda5"}, "latest"]}
+Raw response:
+{"jsonrpc":"2.0","id":2,"result":"0x0000000000000000000000000000000000000000000000000000000000000000"}
+Decimal wei: 0

@@ -610,3 +610,125 @@ def test_build_baw_swap_command_from_quote_reads_token_address(monkeypatch: pyte
     assert res_child.tx_hash == real_tx
     assert res_child.bsctrace_url == f"https://bsctrace.com/tx/{real_tx}"
 
+
+@pytest.mark.asyncio
+async def test_dry_run_requires_approval_summary_branches(
+    nvda_bstock_quote_2usd: dict,
+    nvda_bstock_liq: dict,
+    swap_fixture: dict,
+    approve_fixture: dict,
+    simulate_swap_fixture: dict,
+    simulate_approve_fixture: dict,
+) -> None:
+    """Verifies `run_transaction_dry_run` summary wording when `/pre-transaction/simulate` returns
+    `REQUIRES_APPROVAL` on spender `0xB444...`:
+      1. Wallet available and `allowance(wallet, 0xb300...)` covers amount -> prints sufficient allowance sentence.
+      2. Wallet available and `allowance(wallet, 0xb300...) == 0` -> prints plain router difference wording.
+      3. BSC RPC failure -> falls back to plain router difference wording and never blocks dry-run.
+      4. Wallet not configured (`DEFAULT_QUOTE_WALLET`) -> prints plain router difference wording.
+    """
+    import httpx as _httpx
+    from bine.client import BinanceClient
+    from bine.quote_engine import evaluate_issuer_quote
+
+    now = datetime.now(timezone.utc)
+    _, bstock_sample = _make_nvda_samples(now)
+    winner = evaluate_issuer_quote(
+        sample=bstock_sample,
+        amount_usd=2.0,
+        quote_response=nvda_bstock_quote_2usd,
+        liquidity_response=nvda_bstock_liq,
+        now=now,
+    )
+    user_wallet = "0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730"
+
+    def _sim_router(request):
+        body = json.loads(request.content.decode("utf-8"))
+        to_addr = body["evmTx"]["to"].lower()
+        if to_addr == "0x55d398326f99059ff775485246999027b3197955":
+            return Response(200, json=simulate_approve_fixture)
+        return Response(200, json=simulate_swap_fixture)
+
+    # Branch 1: allowance(wallet, 0xb300...) >= amount_wei (uint256.max - 4e18)
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/aggregator/swap").mock(
+            return_value=Response(200, json=swap_fixture)
+        )
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/aggregator/approve-transaction").mock(
+            return_value=Response(200, json=approve_fixture)
+        )
+        respx_mock.post("https://web3.binance.com/build/api/v1/dex/pre-transaction/simulate").mock(
+            side_effect=_sim_router
+        )
+        respx_mock.post(exec_mod.BSC_PUBLIC_RPC_URL).mock(
+            return_value=Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": "0xffffffffffffffffffffffffffffffffffffffffffffffffc87d2531626fffff",
+                },
+            )
+        )
+        async with BinanceClient(api_key="k", secret_key="s") as client:
+            res_suff = await exec_mod.run_transaction_dry_run(
+                client=client,
+                winner=winner,
+                amount_usd=2.0,
+                wallet_address=user_wallet,
+            )
+        assert res_suff.passed is True
+        assert res_suff.status == "REQUIRES_APPROVAL"
+        assert res_suff.summary == (
+            "Simulation router 0xB444... has no allowance; baw router 0xb300... "
+            "already has sufficient allowance, so no approve tx is expected."
+        )
+
+        # Branch 2: allowance(wallet, 0xb300...) == 0
+        respx_mock.post(exec_mod.BSC_PUBLIC_RPC_URL).mock(
+            return_value=Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                },
+            )
+        )
+        async with BinanceClient(api_key="k", secret_key="s") as client:
+            res_zero = await exec_mod.run_transaction_dry_run(
+                client=client,
+                winner=winner,
+                amount_usd=2.0,
+                wallet_address=user_wallet,
+            )
+        assert res_zero.passed is True
+        assert res_zero.status == "REQUIRES_APPROVAL"
+        assert res_zero.summary == exec_mod.PLAIN_ROUTER_APPROVAL_SUMMARY
+
+        # Branch 3: BSC RPC failure -> falls back to plain wording without blocking
+        respx_mock.post(exec_mod.BSC_PUBLIC_RPC_URL).mock(
+            side_effect=_httpx.ConnectError("BSC RPC unreachable")
+        )
+        async with BinanceClient(api_key="k", secret_key="s") as client:
+            res_err = await exec_mod.run_transaction_dry_run(
+                client=client,
+                winner=winner,
+                amount_usd=2.0,
+                wallet_address=user_wallet,
+            )
+        assert res_err.passed is True
+        assert res_err.status == "REQUIRES_APPROVAL"
+        assert res_err.summary == exec_mod.PLAIN_ROUTER_APPROVAL_SUMMARY
+
+        # Branch 4: Default quote placeholder wallet (no user wallet configured)
+        async with BinanceClient(api_key="k", secret_key="s") as client:
+            res_nowallet = await exec_mod.run_transaction_dry_run(
+                client=client,
+                winner=winner,
+                amount_usd=2.0,
+            )
+        assert res_nowallet.passed is True
+        assert res_nowallet.status == "REQUIRES_APPROVAL"
+        assert res_nowallet.summary == exec_mod.PLAIN_ROUTER_APPROVAL_SUMMARY
+

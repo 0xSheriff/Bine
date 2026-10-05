@@ -17,6 +17,7 @@
 | `wallet_balance_second_swap_2026-10-05.json` | **Captured live (`2026-10-05T15:05Z`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 wallet balance --binanceChainId 56 --json` immediately after the second `$2.00` `NVDAB` swap (`0.016939642456644862 NVDAB`, `1.00 USDT`). |
 | `market_order_list_second_swap_2026-10-05.json` | **Captured live (`2026-10-05T15:05Z`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 market-order list --json` showing both finished `$2.00` `NVDAB` orders (`26100500001942767719` and `26100300001937918737`). |
 | `tx_history_second_swap_2026-10-05.json` | **Captured live (`2026-10-05T15:05Z`)** | Direct pipe (`tee`) of `npx --yes @binance/agentic-wallet@1.10.0 wallet tx-history --binanceChainId 56 --json` showing today's swap (`0xa3693383...3e75`) and the Oct 3 swap + approve transactions. |
+| `usdt_allowance_2026-10-05.txt` | **Queried live (`2026-10-05`)** | Raw JSON-RPC `eth_call` (`0xdd62ed3e` `allowance(owner, spender)`) requests and responses against `https://bsc-dataseed.binance.org` for owner `0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730` and spenders `0xb300000b72DEAEb607a12d5f54773D1C19c7028d` (`uint256.max - 4 * 10^18`) and `0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5` (`0`). |
 
 ---
 

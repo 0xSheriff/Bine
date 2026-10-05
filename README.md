@@ -6,13 +6,15 @@
 
 ## Run it in 3 commands
 
+Requires `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` for the Binance Web3 Open API (`https://web3.binance.com/build`). Without those two keys in `.env`, `GET /build/rwa/tokens?chainId=56` returns an empty `HTTP 302` response and every ticker is refused as `unknown_ticker`.
+
 ```bash
 git clone <repo-url> bine && cd bine && python3 -m venv .venv && .venv/bin/pip install -e backend
-cp .env.example .env && (.venv/bin/uvicorn bine.app:app --app-dir backend --port 8000 &)
+printf "BINANCE_API_KEY=<your-key>\nBINANCE_SECRET_KEY=<your-secret>\n" > .env && (.venv/bin/uvicorn bine.app:app --app-dir backend --port 8000 &)
 .venv/bin/bine check NVDA 5.50
 ```
 
-Set `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` in `.env` before starting `uvicorn`. `bine` and `bine-mcp` connect to `BINE_API_URL` (default `http://localhost:8000`). If `http://localhost:8000` is not running, `bine` prints a single line showing how to start it (`uvicorn bine.app:app --app-dir backend --port 8000`). Optional single-service hosting notes are in [`docs/optional-hosting.md`](docs/optional-hosting.md).
+`bine` and `bine-mcp` connect to `BINE_API_URL` (default `http://localhost:8000`) when keys are not in the caller's environment, or sign requests directly when `.env` is present in the current directory. If `http://localhost:8000` is not running, `bine` prints a single line showing how to start it (`uvicorn bine.app:app --app-dir backend --port 8000`). Optional single-service hosting notes are in [`docs/optional-hosting.md`](docs/optional-hosting.md).
 
 ---
 

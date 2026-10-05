@@ -21,6 +21,7 @@ from bine.app import _resolve_ticker_samples
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
 from bine.config import Settings, get_settings
 from bine.database import AsyncSessionLocal, init_db
+from bine.errors import AuthError
 from bine.execution import build_baw_swap_command_from_quote, execute_trade_pipeline
 from bine.quote_engine import (
     DEFAULT_QUOTE_WALLET,
@@ -33,13 +34,16 @@ DEFAULT_BINE_API_URL = "http://localhost:8000"
 
 
 class BackendUnreachableError(RuntimeError):
-    """Raised when the Bine HTTP backend at BINE_API_URL cannot be reached."""
+    """Raised when the Bine HTTP backend at BINE_API_URL cannot be reached or returns an error."""
 
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, message: str | None = None) -> None:
         self.base_url = base_url
         super().__init__(
-            f"Cannot reach Bine backend at {base_url} — start it with: "
-            "uvicorn bine.app:app --app-dir backend --port 8000"
+            message
+            or (
+                f"Cannot reach Bine backend at {base_url} — start it with: "
+                "uvicorn bine.app:app --app-dir backend --port 8000"
+            )
         )
 
 
@@ -79,6 +83,16 @@ def format_plain_check_line(result: dict[str, Any]) -> str:
     return line
 
 
+def _extract_http_error_detail(resp: httpx.Response) -> str | None:
+    try:
+        payload = resp.json()
+        if isinstance(payload, dict) and isinstance(payload.get("detail"), str):
+            return payload["detail"]
+    except Exception:
+        pass
+    return None
+
+
 async def run_check(
     ticker: str,
     amount_usd: float = 5.50,
@@ -100,7 +114,10 @@ async def run_check(
                 resp = await hc.get(f"{base}/api/quote", params=params)
                 resp.raise_for_status()
                 return dict(resp.json())
-        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+        except httpx.HTTPStatusError as exc:
+            detail = _extract_http_error_detail(exc.response)
+            raise BackendUnreachableError(base, detail) from exc
+        except httpx.RequestError as exc:
             raise BackendUnreachableError(base) from exc
 
     maybe_enable_dev_dns_fallback(cfg.dev_dns_fallback)
@@ -159,7 +176,10 @@ async def run_buy_step(
                 )
                 resp.raise_for_status()
                 return dict(resp.json())
-        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+        except httpx.HTTPStatusError as exc:
+            detail = _extract_http_error_detail(exc.response)
+            raise BackendUnreachableError(base, detail) from exc
+        except httpx.RequestError as exc:
             raise BackendUnreachableError(base) from exc
 
     maybe_enable_dev_dns_fallback(cfg.dev_dns_fallback)
@@ -215,6 +235,9 @@ def _cmd_check(args: argparse.Namespace) -> int:
     except BackendUnreachableError as exc:
         print(str(exc))
         return 1
+    except AuthError:
+        print("Binance API keys missing or rejected")
+        return 1
     if args.json:
         print(json.dumps(result, indent=2))
     else:
@@ -233,6 +256,9 @@ def _cmd_buy(args: argparse.Namespace) -> int:
         )
     except BackendUnreachableError as exc:
         print(str(exc))
+        return 1
+    except AuthError:
+        print("Binance API keys missing or rejected")
         return 1
     quote = dry_result.get("quote") or {}
     print(format_plain_check_line(quote))

@@ -17,7 +17,14 @@ class BinanceAPIError(Exception):
         super().__init__(f"[{code}] {msg}")
 
 
-class SignatureError(BinanceAPIError):
+class AuthError(BinanceAPIError):
+    """40101 / HTTP 302 / HTTP 401 / non-JSON — Binance API keys missing or rejected."""
+
+    def __init__(self, code: int = 40101, msg: str = "Binance API keys missing or rejected", *, status_code: int = 401):
+        super().__init__(code, msg, status_code=status_code)
+
+
+class SignatureError(AuthError):
     """40102 — HMAC signature mismatch. Almost always a signing bug."""
     pass
 
@@ -47,6 +54,7 @@ class MarketHoursError(BinanceAPIError):
 
 # Map API error codes to exception classes
 _CODE_MAP: dict[int, type[BinanceAPIError]] = {
+    40101: AuthError,
     40102: SignatureError,
     40103: TimestampError,
     42900: RateLimitError,
@@ -62,3 +70,4 @@ def raise_for_code(code: int, msg: str, *, status_code: int = 200) -> None:
         return
     exc_class = _CODE_MAP.get(code, BinanceAPIError)
     raise exc_class(code, msg, status_code=status_code)
+

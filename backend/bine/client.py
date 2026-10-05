@@ -27,7 +27,7 @@ from urllib.parse import urlencode
 import anyio
 import httpx
 
-from bine.errors import BinanceAPIError, RateLimitError, raise_for_code
+from bine.errors import AuthError, BinanceAPIError, RateLimitError, raise_for_code
 
 logger = logging.getLogger(__name__)
 
@@ -258,9 +258,39 @@ class BinanceClient:
                         backoff *= 2
                         continue
 
-                # Parse response — all Binance responses return HTTP 200
+                # HTTP 301/302 redirect (e.g. missing/unauthenticated path) -> AuthError
+                if resp.status_code in (301, 302, 303, 307, 308):
+                    raise AuthError(
+                        40101,
+                        "Binance API keys missing or rejected",
+                        status_code=resp.status_code,
+                    )
+
+                # Parse response — all Binance responses return JSON
                 # with business status in the `code` field
-                data = resp.json()
+                try:
+                    data = resp.json()
+                except ValueError as exc:
+                    raise AuthError(
+                        40101,
+                        "Binance API keys missing or rejected",
+                        status_code=resp.status_code,
+                    ) from exc
+
+                if not isinstance(data, dict):
+                    raise AuthError(
+                        40101,
+                        "Binance API keys missing or rejected",
+                        status_code=resp.status_code,
+                    )
+
+                if resp.status_code in (401, 403):
+                    raise AuthError(
+                        int(data.get("code") or 40101),
+                        str(data.get("msg") or "Binance API keys missing or rejected"),
+                        status_code=resp.status_code,
+                    )
+
                 code = data.get("code", -1)
                 msg = data.get("msg", "unknown error")
 

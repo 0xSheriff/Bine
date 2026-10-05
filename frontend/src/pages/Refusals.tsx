@@ -34,8 +34,8 @@ export default function Refusals() {
     {
       key: 'ratio',
       label: ratioEx
-        ? `${ratioEx.ticker} (${ratioEx.symbol}) at $5.50 — Catalog share-ratio trap (${ratioEx.token_to_share_ratio}x shares/token)`
-        : 'Catalog share-ratio trap',
+        ? `${ratioEx.ticker} (${ratioEx.symbol}) at $5.50 — Share ratio ${ratioEx.token_to_share_ratio}x shares/token (supported limit: 0.25–5.00x)`
+        : 'Share ratio outside supported 0.25–5.00x limit',
       ticker: ratioEx?.ticker || 'KLAC',
       amount: 5.5,
     },

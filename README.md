@@ -6,7 +6,7 @@
 
 ## Run it in 3 commands
 
-Requires `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` for the Binance Web3 Open API (`https://web3.binance.com/build`). Without those two keys in `.env`, `GET /build/rwa/tokens?chainId=56` returns an empty `HTTP 302` response and every ticker is refused as `unknown_ticker`.
+Requires `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` for the Binance Web3 Open API (`https://web3.binance.com/build`). Without valid keys in `.env`, `/api/quote` returns `HTTP 503` (`"Binance API keys missing or rejected"`) and `bine` prints that single line with exit code `1`.
 
 ```bash
 git clone <repo-url> bine && cd bine && python3 -m venv .venv && .venv/bin/pip install -e backend
@@ -14,7 +14,7 @@ printf "BINANCE_API_KEY=<your-key>\nBINANCE_SECRET_KEY=<your-secret>\n" > .env &
 .venv/bin/bine check NVDA 5.50
 ```
 
-`bine` and `bine-mcp` connect to `BINE_API_URL` (default `http://localhost:8000`) when keys are not in the caller's environment, or sign requests directly when `.env` is present in the current directory. If `http://localhost:8000` is not running, `bine` prints a single line showing how to start it (`uvicorn bine.app:app --app-dir backend --port 8000`). Optional single-service hosting notes are in [`docs/optional-hosting.md`](docs/optional-hosting.md).
+`bine` and `bine-mcp` connect to `BINE_API_URL` (default `http://localhost:8000`) when `BINE_DIRECT_MODE=true` is not set. If `http://localhost:8000` is not running, `bine` prints a single line showing how to start it (`uvicorn bine.app:app --app-dir backend --port 8000`). Optional single-service hosting notes are in [`docs/optional-hosting.md`](docs/optional-hosting.md).
 
 ---
 
@@ -24,7 +24,7 @@ printf "BINANCE_API_KEY=<your-key>\nBINANCE_SECRET_KEY=<your-secret>\n" > .env &
 - **Routes**:
   - `/` — Pre-trade guard (`NVDA` at `$5.50` default) + Transaction API `/simulate` dry-run
   - `/integrate` — Copy-paste snippets for `curl`, `bine`, MCP config JSON, Wallet Skill install, and frozen v1 schema
-  - `/refusals` — Live refusal cards fetched from `GET /api/quote` and `/api/tickers` (`below_issuer_minimum`, `slippage_too_high`, `quality_unreliable`, share-ratio trap, `market_closed`)
+  - `/refusals` — Live refusal cards fetched from `GET /api/quote` and `/api/tickers` (`below_issuer_minimum`, `slippage_too_high`, `quality_unreliable`, share-ratio limit, `market_closed`)
   - `/receipts` — Read-only list of executed on-chain trades with `tx_hash` and BscTrace links (dry-runs excluded)
 
 ---
@@ -107,16 +107,17 @@ cp skills/bine-pre-trade-guard/SKILL.md ~/.claude/skills/bine-pre-trade-guard/SK
 
 | View | Light (`1440px`) | Dark (`1440px`) | Mobile (`390px`) |
 |---|---|---|---|
-| **BUY (`NVDA` `$5.50`)** | `ui_buy_light_1440.png` | `ui_buy_dark_1440.png` | `ui_buy_light_390.png` |
-| **REFUSE (`AAPL` `$2.00`)** | `ui_refuse_light_1440.png` | `ui_refuse_dark_1440.png` | `ui_refuse_light_390.png` |
-| **REFUSE (`SPYon` `$250.00`)** | `ui_refuse_spyon_light_1440.png` | `ui_refuse_spyon_dark_1440.png` | `ui_refuse_spyon_light_390.png` |
-| **Dry-Run Confirm Panel** | `ui_confirm_light_1440.png` | `ui_confirm_dark_1440.png` | `ui_confirm_light_390.png` |
+| **BUY (`NVDA` `$5.50`)** | [`docs/screenshots/ui_buy_light_1440.png`](docs/screenshots/ui_buy_light_1440.png) | [`docs/screenshots/ui_buy_dark_1440.png`](docs/screenshots/ui_buy_dark_1440.png) | [`docs/screenshots/ui_buy_light_390.png`](docs/screenshots/ui_buy_light_390.png) |
+| **REFUSE (`AAPL` `$2.00`)** | [`docs/screenshots/ui_refuse_light_1440.png`](docs/screenshots/ui_refuse_light_1440.png) | [`docs/screenshots/ui_refuse_dark_1440.png`](docs/screenshots/ui_refuse_dark_1440.png) | [`docs/screenshots/ui_refuse_light_390.png`](docs/screenshots/ui_refuse_light_390.png) |
+| **REFUSE (`SPYon` `$250.00`)** | [`docs/screenshots/ui_refuse_spyon_light_1440.png`](docs/screenshots/ui_refuse_spyon_light_1440.png) | [`docs/screenshots/ui_refuse_spyon_dark_1440.png`](docs/screenshots/ui_refuse_spyon_dark_1440.png) | [`docs/screenshots/ui_refuse_spyon_light_390.png`](docs/screenshots/ui_refuse_spyon_light_390.png) |
+| **Dry-Run Confirm Panel** | [`docs/screenshots/ui_confirm_light_1440.png`](docs/screenshots/ui_confirm_light_1440.png) | [`docs/screenshots/ui_confirm_dark_1440.png`](docs/screenshots/ui_confirm_dark_1440.png) | [`docs/screenshots/ui_confirm_light_390.png`](docs/screenshots/ui_confirm_light_390.png) |
 
 ---
 
 ## Safety Defaults
 
 - **`BINE_LIVE_MODE=false` by default**: `POST /api/execute` and `bine buy` run `POST /api/v1/dex/pre-transaction/simulate` dry-runs only unless explicitly enabled.
+- **Quote placeholder address**: `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (`DEFAULT_QUOTE_WALLET`) is a placeholder public address used only for read-only `/api/v1/dex/aggregator/quote` requests when `BINE_WALLET_ADDRESS` is not configured.
 - **`BINE_ADMIN_TOKEN` constant-time gate**: Any request with `execute_live=true` requires a matching `X-Bine-Admin-Token` header (`hmac.compare_digest`), returning `HTTP 403` otherwise.
 - **Hard trade caps**: `BINE_MAX_TRADE_USD=6.00` per trade and `BINE_DAILY_CAP_USD=10.00` per UTC day.
 - **Rate limits & CORS**: Sliding-window per-IP rate limits (`60 req/min` on `/api/quote`, `20 req/min` on `/api/execute`) and explicit `GET, POST` origin allowlist.
@@ -125,7 +126,9 @@ cp skills/bine-pre-trade-guard/SKILL.md ~/.claude/skills/bine-pre-trade-guard/SK
 
 ## Verified On-Chain Execution & Evidence Artifacts
 
-- **Dry-run artifact (`docs/dry_run_nvda_2usd.json`)**: `"passed": true` with `"fail_reason": "execution reverted: BEP20: transfer amount exceeds allowance"` is the expected pre-approval state when simulating raw `/api/v1/dex/aggregator/swap` calldata before USDT is approved to the router (`0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5`), and the approval simulation (`"approval_simulation_status": "SUCCESS"`) returned `SUCCESS`.
-- **Live `$2` `NVDAB` swap artifact (`docs/live_swap_nvda_2usd.json`) & reconciliation note**: First-time swaps run an `approve` tx (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`) before the `swap` tx (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`). `baw market-order swap` returns the parent `orderId` (`26100300001937918699`), `--orderId` on it returns an empty list, and only `baw market-order list --json` shows the child (`orderId` `26100300001937918737`). The first live `$2` `NVDAB` swap recorded the parent `orderId` (`26100300001937918699`) and no `txHash`; `docs/live_swap_nvda_2usd.json` and `DecisionLog #16` were reconciled afterwards from `baw market-order list` (child `orderId` `26100300001937918737`) and the BSC receipt for `0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`. Untouched `baw` outputs and the commands that produced them are kept in `docs/raw/`.
+- **Dry-run artifact (`docs/dry_run_nvda_2usd.json`) vs. `baw` live router contract**:
+  - `"passed": true` with `"fail_reason": "execution reverted: BEP20: transfer amount exceeds allowance"` is the expected pre-approval state when simulating raw `/api/v1/dex/aggregator/swap` calldata before USDT is approved to the DEX aggregator router (`0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5`), and the approval simulation (`"approval_simulation_status": "SUCCESS"`) returned `SUCCESS`.
+  - The Transaction API dry-run simulated the `/api/v1/dex/aggregator/swap` calldata targeting router `0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5`, whereas the live swap executed through `baw`'s own router contract (`0xb300000b72DEAEb607a12d5f54773D1C19c7028d`), as evidenced by the `approve` transaction (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`, which approved `2000000000000000000` wei of USDT to spender `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`) and the `swap` transaction (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, whose `to` address is `0xb300000b72deaeb607a12d5f54773d1c19c7028d`).
+- **Live `$2` `NVDAB` swap artifact (`docs/live_swap_nvda_2usd.json`) & reconciliation note**: First-time swaps run an `approve` tx (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`) before the `swap` tx (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`). `baw market-order swap` returns the parent `orderId` (`26100300001937918699`), `--orderId` on it returns an empty list, and only `baw market-order list --json` shows the child (`orderId` `26100300001937918737`). The first live `$2` `NVDAB` swap recorded the parent `orderId` (`26100300001937918699`) and no `txHash`; `docs/live_swap_nvda_2usd.json` and `DecisionLog #16` were reconciled afterwards from `baw market-order list` (child `orderId` `26100300001937918737`) and the BSC receipt for `0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`. Raw `baw` outputs and the commands that produced them are kept in `docs/raw/`.
 - **Share-ratio balance reconciliation**: `baw wallet balance` shows `0.00851201289192116` `NVDAB`, while `eth_call` `balanceOf(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730)` returns `8505393792444895` wei (`0.0085053938` raw tokens). The gap equals `tokenToShareRatio` `1.0007782237528078` (`0.008505393792444894 * 1.0007782237528078 = 0.00851201289192116`).
 

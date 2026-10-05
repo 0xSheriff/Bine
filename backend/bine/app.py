@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
 from bine.config import get_settings
 from bine.database import AsyncSessionLocal, init_db
+from bine.errors import AuthError
 from bine.execution import execute_trade_pipeline
 from bine.models import DecisionLog, TokenSample
 from bine.quality import (
@@ -265,6 +266,8 @@ async def _resolve_ticker_samples(
         # If catalog succeeded and has tokens, but ticker is not in catalog -> unknown_ticker
         if catalog:
             return []
+    except AuthError:
+        raise
     except Exception as exc:
         logger.debug("Live /rwa/tokens fetch fell back to DB (%s: %s)", type(exc).__name__, exc)
 
@@ -444,27 +447,33 @@ async def quote_stock(
     maybe_enable_dev_dns_fallback(settings.dev_dns_fallback)
     wallet = settings.bine_wallet_address or DEFAULT_QUOTE_WALLET
 
-    async with BinanceClient(
-        api_key=settings.binance_api_key,
-        secret_key=settings.binance_secret_key,
-    ) as client:
-        rows = await _resolve_ticker_samples(client, ticker_upper)
-        if rows:
-            evaluations = list(
-                await asyncio.gather(
-                    *(
-                        fetch_live_issuer_quote_and_liquidity(
-                            client=client,
-                            sample=row,
-                            amount_usd=amount_usd,
-                            wallet_address=wallet,
+    try:
+        async with BinanceClient(
+            api_key=settings.binance_api_key,
+            secret_key=settings.binance_secret_key,
+        ) as client:
+            rows = await _resolve_ticker_samples(client, ticker_upper)
+            if rows:
+                evaluations = list(
+                    await asyncio.gather(
+                        *(
+                            fetch_live_issuer_quote_and_liquidity(
+                                client=client,
+                                sample=row,
+                                amount_usd=amount_usd,
+                                wallet_address=wallet,
+                            )
+                            for row in rows
                         )
-                        for row in rows
                     )
                 )
-            )
-        else:
-            evaluations = []
+            else:
+                evaluations = []
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Binance API keys missing or rejected",
+        ) from exc
 
     verdict_resp = build_verdict(
         ticker=ticker_upper,

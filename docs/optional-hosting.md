@@ -38,3 +38,13 @@ python3 -m venv .venv
 .venv/bin/pip install -e .
 BINE_LIVE_MODE=false .venv/bin/uvicorn bine.app:app --host 0.0.0.0 --port 8000
 ```
+
+---
+
+## 4. Dry-Run Router (`0xB44446b0...`) vs. Live `baw` Router (`0xb300000b...`)
+
+- **Transaction API Dry-Run (`POST /api/v1/dex/pre-transaction/simulate`)**: Simulates the raw calldata returned by `GET /api/v1/dex/aggregator/swap` (and `GET /api/v1/dex/aggregator/approve-transaction`), which targets the DEX aggregator router `0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5` (`docs/dry_run_nvda_2usd.json`).
+- **Live Execution (`baw market-order swap`)**: Executes on-chain through `@binance/agentic-wallet`'s own router contract `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`, as shown by the on-chain evidence in `docs/live_swap_nvda_2usd.json` and `docs/raw/tx_history_2026-10-05.json`:
+  - **Approve tx (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`)**: Approved `2000000000000000000` wei (`2.00 USDT`) to spender `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`.
+  - **Swap tx (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`)**: Sent `from` wallet `0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730` `to` contract `0xb300000b72deaeb607a12d5f54773d1c19c7028d`.
+

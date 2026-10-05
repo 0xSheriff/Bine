@@ -65,7 +65,7 @@ def assess_token_quality(
         return QualityCheck(
             False,
             "unreliable",
-            f"Extreme tokenToShareRatio ({token_to_share_ratio:.6f}x outside [{MIN_SHARE_RATIO}, {MAX_SHARE_RATIO}])",
+            f"Share ratio {token_to_share_ratio:.6f}x is outside the supported [{MIN_SHARE_RATIO}, {MAX_SHARE_RATIO}] limit",
         )
 
     expected_ref = token_price / token_to_share_ratio

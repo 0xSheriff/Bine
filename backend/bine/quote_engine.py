@@ -402,9 +402,9 @@ def evaluate_issuer_quote(
             qual_msg = f"{sample.token_symbol} has a reference price of ${sample.reference_price:.4f} (under the $1.00 minimum). Data is unreliable — not buying."
         elif sample.token_to_share_ratio is not None and (sample.token_to_share_ratio < 0.25 or sample.token_to_share_ratio > 5.0):
             qual_msg = (
-                f"{sample.token_symbol} has an extreme share ratio ({sample.token_to_share_ratio:.4f} shares per token: "
-                f"token price ${(sample.token_price or 0):,.2f} vs ${(sample.reference_price or 0):,.2f} reference). "
-                f"Data is unreliable — not buying."
+                f"{sample.token_symbol} has a share ratio of {sample.token_to_share_ratio:.4f} shares per token "
+                f"(token price ${(sample.token_price or 0):,.2f} vs ${(sample.reference_price or 0):,.2f} reference), "
+                f"outside the supported 0.25–5.00x limit — not buying."
             )
         elif sample.volume_24h is None or sample.volume_24h < 1_000_000:
             qual_msg = f"{sample.token_symbol} has only ${(sample.volume_24h or 0):,.0f} in 24-hour volume (under the $1M minimum). Too illiquid — not buying."

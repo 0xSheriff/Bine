@@ -1,0 +1,14 @@
+=== Command: keyless GET /api/v1/dex/market/rwa/tokens?binanceChainId=56&platformId=ondo ===
+status_code: 401
+location_header: None
+content_type: 'application/json'
+headers: {'content-type': 'application/json', 'content-length': '78', 'connection': 'keep-alive', 'date': 'Mon, 05 Oct 2026 03:41:49 GMT', 'x-oc-blocked-by': 'AuthenticationFilter/40101', 'vary': 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers', 'x-oc-trace-id': 'unknown-gateway-68a7ac4cdc4449c79fdded9281d586b7', 'x-cache': 'Error from cloudfront', 'via': '1.1 1fda9ca0b9c3b1d9e4c7f41209108d08.cloudfront.net (CloudFront)', 'x-amz-cf-pop': 'LOS50-P5', 'x-amz-cf-id': '3KmGgCUA5oUaCjdoKxpsl6nCE9Z27QdkWyTGwc4h3_224ywQ1tCRMA=='}
+body_len: 78
+body_repr: '{"timestamp":1791171709211,"msg":"API Key is required","data":"","code":40101}'
+=== Command: keyless GET /rwa/tokens?chainId=56 ===
+status_code: 302
+location_header: 'https://web3.binance.com/en/build/rwa/tokens?chainId=56'
+content_type: None
+headers: {'content-length': '0', 'connection': 'keep-alive', 'date': 'Mon, 05 Oct 2026 03:41:50 GMT', 'strict-transport-security': 'max-age=31536000; includeSubdomains', 'k8scluster': 'master', 'location': 'https://web3.binance.com/en/build/rwa/tokens?chainId=56', 'x-gateway': 'traefik', 'x-trace-id': '393f4ec901ba4c5d878d12dcc125ab09', 'x-traefik-duration': '0.00', 'x-frame-options': 'SAMEORIGIN', 'x-content-type-options': 'nosniff', 'referrer-policy': 'origin-when-cross-origin', 'x-cache': 'Miss from cloudfront', 'via': '1.1 1fda9ca0b9c3b1d9e4c7f41209108d08.cloudfront.net (CloudFront)', 'x-amz-cf-pop': 'LOS50-P5', 'x-amz-cf-id': 'vDAJJVi0FCusGIWt9HO8oD1zy7Wq_24vQkKZqBD_65Ty0WQwQ6A37Q=='}
+body_len: 0
+body_repr: ''

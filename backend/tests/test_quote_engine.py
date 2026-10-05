@@ -283,6 +283,11 @@ def test_refusal_rule_quality_unreliable(
     )
     assert ev.eligible is False
     assert ev.refusal_code == "quality_unreliable"
+    assert ev.refusal_reason == (
+        "ENLVon has a share ratio of 0.0667 shares per token "
+        "(token price $1.07 vs $16.05 reference), "
+        "outside the supported 0.25–5.00x limit — not buying."
+    )
 
 
 def test_refusal_rule_market_closed(
@@ -616,4 +621,65 @@ def test_cli_unreachable_backend_prints_single_line(
         assert len(out_lines) == 1
         assert "Cannot reach Bine backend at http://localhost:8000" in out_lines[0]
         assert "uvicorn bine.app:app" in out_lines[0]
+
+
+def test_missing_or_rejected_api_keys_returns_503_and_cli_single_line(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Missing or rejected Binance API keys (302/401/non-JSON) raise AuthError, return HTTP 503 on /api/quote, and print one line in CLI."""
+    import asyncio
+    import httpx as _httpx
+    from httpx import ASGITransport, AsyncClient
+
+    from bine.app import _QUOTE_CACHE, app, reset_rate_limits
+    from bine.cli import main as cli_main
+    from bine.client import BASE_URL, BinanceClient
+    from bine.errors import AuthError
+    from bine.quote_engine import clear_rwa_catalog_cache
+
+    clear_rwa_catalog_cache()
+    _QUOTE_CACHE.clear()
+    reset_rate_limits()
+
+    with respx.mock(assert_all_called=False) as respx_mock:
+        # 1. Direct BinanceClient raises AuthError on HTTP 302 or non-JSON
+        respx_mock.get(url__regex=rf"^{BASE_URL}/api/v1/dex/market/rwa/tokens.*").mock(
+            return_value=_httpx.Response(
+                302,
+                headers={"Location": "https://web3.binance.com/en/build/rwa/tokens?chainId=56"},
+                text="",
+            )
+        )
+
+        async def _check_api_503() -> None:
+            async with BinanceClient(api_key="", secret_key="") as bc:
+                with pytest.raises(AuthError, match="Binance API keys missing or rejected"):
+                    await bc.get("/api/v1/dex/market/rwa/tokens", params={"binanceChainId": "56", "platformId": "ondo"})
+
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                r = await ac.get("/api/quote?ticker=NVDA&amount_usd=5.50")
+                assert r.status_code == 503
+                assert r.json() == {"detail": "Binance API keys missing or rejected"}
+
+        asyncio.run(_check_api_503())
+
+        # 2. CLI prints "Binance API keys missing or rejected" as one line and exits non-zero
+        monkeypatch.setenv("BINANCE_API_KEY", "")
+        monkeypatch.setenv("BINANCE_SECRET_KEY", "")
+        monkeypatch.delenv("BINE_API_URL", raising=False)
+        respx_mock.get("http://localhost:8000/api/quote").mock(
+            return_value=_httpx.Response(
+                503,
+                json={"detail": "Binance API keys missing or rejected"},
+            )
+        )
+        capsys.readouterr()
+        rc = cli_main(["check", "NVDA", "5.50"])
+        captured = capsys.readouterr()
+        out_lines = [ln for ln in captured.out.strip().splitlines() if ln.strip()]
+        assert rc == 1
+        assert out_lines == ["Binance API keys missing or rejected"]
+
 

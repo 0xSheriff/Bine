@@ -265,9 +265,37 @@ def test_refusal_rule_quality_unreliable(
     nvda_ondo_quote_fixture: dict,
     nvda_ondo_liq_fixture: dict,
 ) -> None:
-    """Refuses when token fails data-quality filter (e.g. ENLVon reverse split outlier)."""
+    """Refuses with a single reason:
+      1. Quarantined sub-$1.00 token (e.g. ENLVon at $0.0017) -> quality_unreliable with only quarantine text (even if quote fails).
+      2. Out-of-range share ratio (outside 0.25-5.00x) with valid quote -> quality_unreliable stating the ratio range and price consistency.
+      3. Non-quarantined token whose quote fails with [40374] -> depth_thin with only the liquidity reason.
+    """
     now = datetime.now(timezone.utc)
     ondo_sample, _ = _make_nvda_samples(now)
+
+    # Case 1: Quarantined sub-$1.00 token (ENLVon at $0.0017) where quote also fails -> quality_unreliable only
+    enlv_quarantined = copy.deepcopy(ondo_sample)
+    enlv_quarantined.token_symbol = "ENLVon"
+    enlv_quarantined.underlying_ticker = "ENLV"
+    enlv_quarantined.token_price = 0.0017
+    enlv_quarantined.reference_price = 0.0255
+    enlv_quarantined.token_to_share_ratio = 0.066667
+    ev_enlv_q = evaluate_issuer_quote(
+        sample=enlv_quarantined,
+        amount_usd=5.50,
+        quote_response=None,
+        liquidity_response={"code": 0, "msg": "success", "data": []},
+        quote_error="[40367] Token is currently in a non-trading session.",
+        now=now,
+    )
+    assert ev_enlv_q.eligible is False
+    assert ev_enlv_q.refusal_code == "quality_unreliable"
+    assert ev_enlv_q.refusal_reason == (
+        "ENLVon trades at $0.0017 (under the $1.00 minimum price filter). Data is unreliable. Not buying."
+    )
+    assert "No pool on BNB Chain" not in ev_enlv_q.refusal_reason
+
+    # Case 2: Non-quarantined token outside the 0.25-5.00x share-ratio range with a valid quote -> quality_unreliable
     ondo_sample.token_symbol = "ENLVon"
     ondo_sample.underlying_ticker = "ENLV"
     ondo_sample.token_price = 1.07
@@ -284,13 +312,13 @@ def test_refusal_rule_quality_unreliable(
     assert ev.eligible is False
     assert ev.refusal_code == "quality_unreliable"
     assert ev.refusal_reason == (
-        "ENLVon has a share ratio of 0.0667 shares per token "
-        "(token price $1.07 vs $16.05 reference), "
-        "outside the supported 0.25–5.00x limit — not buying."
+        "ENLVon has a share ratio of 0.0667 shares per token, "
+        "outside the 0.25-5.00x share-ratio range chosen by this tool "
+        "(quoted price $1.07 is consistent with the $16.05 reference). "
+        "Not buying."
     )
 
-    # When /quote fails with 40374 (Insufficient liquidity), depth_thin is reported first
-    # and the share-ratio note is included as a second line:
+    # Case 3: Non-quarantined token whose /quote fails with [40374] -> depth_thin with only the liquidity reason
     klac_sample = copy.deepcopy(ondo_sample)
     klac_sample.token_symbol = "KLACon"
     klac_sample.underlying_ticker = "KLAC"
@@ -307,20 +335,12 @@ def test_refusal_rule_quality_unreliable(
     )
     assert ev_klac.eligible is False
     assert ev_klac.refusal_code == "depth_thin"
-    assert ev_klac.refusal_reason == (
-        "No pool on BNB Chain can fill $25.00 of KLACon right now. Not buying.\n"
-        "KLACon has a share ratio of 10.0680 shares per token "
-        "(token price $17,121.02 vs $1,700.54 reference), "
-        "outside the supported 0.25–5.00x limit — not buying."
-    )
+    assert ev_klac.refusal_reason == "No pool on BNB Chain can fill $25.00 of KLACon right now. Not buying."
     verdict_klac = build_verdict("KLAC", 25.0, [ev_klac], now=now)
     d_klac = verdict_klac.to_dict()
     assert d_klac["verdict"] == "REFUSE"
     assert d_klac["refusal"]["code"] == "depth_thin"
-    assert d_klac["refusal"]["message"].splitlines() == [
-        "No pool on BNB Chain can fill $25.00 of KLACon right now. Not buying.",
-        "KLACon has a share ratio of 10.0680 shares per token (token price $17,121.02 vs $1,700.54 reference), outside the supported 0.25–5.00x limit — not buying.",
-    ]
+    assert d_klac["refusal"]["message"] == "No pool on BNB Chain can fill $25.00 of KLACon right now. Not buying."
 
 
 def test_refusal_rule_market_closed(

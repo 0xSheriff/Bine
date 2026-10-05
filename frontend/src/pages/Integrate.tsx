@@ -11,7 +11,7 @@ const SNIPPETS = [
   },
   {
     id: 'cli',
-    title: '2. CLI (bine check — defaults to BINE_API_URL=http://localhost:8000)',
+    title: '2. CLI (bine check, defaults to BINE_API_URL=http://localhost:8000)',
     code: `pip install -e backend\nbine check NVDA 5.50\nbine check SPYon 250 --json`,
   },
   {

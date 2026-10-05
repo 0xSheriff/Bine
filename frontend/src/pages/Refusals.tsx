@@ -15,34 +15,34 @@ export default function Refusals() {
   const specs = [
     {
       key: 'min',
-      label: 'AAPL at $2.00 — Ondo $5 minimum order',
+      label: 'AAPL at $2.00, Ondo $5 minimum order',
       ticker: 'AAPL',
       amount: 2,
     },
     {
       key: 'slip',
-      label: 'SPYon at $250.00 — Thin PMM/DEX pool cliff',
+      label: 'SPYon at $250.00, Thin PMM/DEX pool cliff',
       ticker: 'SPYon',
       amount: 250,
     },
     {
       key: 'enlv',
-      label: 'ENLV at $5.50 — Quarantined sub-$1 outlier',
+      label: 'ENLV at $5.50, Quarantined sub-$1 outlier',
       ticker: 'ENLV',
       amount: 5.5,
     },
     {
       key: 'ratio',
       label: ratioEx
-        ? `${ratioEx.ticker} (${ratioEx.symbol}) at $5.50 — Share ratio ${ratioEx.token_to_share_ratio}x shares/token (supported limit: 0.25–5.00x)`
-        : 'Share ratio outside supported 0.25–5.00x limit',
+        ? `${ratioEx.ticker} (${ratioEx.symbol}) at $5.50, Outside the 0.25-5.00x share-ratio range chosen by this tool (ratio ${ratioEx.token_to_share_ratio}x, quoted price consistent with reference)`
+        : 'Outside the 0.25-5.00x share-ratio range chosen by this tool (quoted price consistent with reference)',
       ticker: ratioEx?.ticker || 'KLAC',
       amount: 5.5,
     },
     {
       key: 'closed',
       label: closedEx
-        ? `${closedEx.ticker} (${closedEx.symbol}) at $5.50 — Session ${closedEx.reason_code} (${closedEx.market_status})`
+        ? `${closedEx.ticker} (${closedEx.symbol}) at $5.50, Session ${closedEx.reason_code} (${closedEx.market_status})`
         : 'Catalog session-unsupported token',
       ticker: closedEx?.ticker || 'ICHR',
       amount: 5.5,

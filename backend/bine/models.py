@@ -1,11 +1,11 @@
 """SQLAlchemy models for the BINE Atlas.
 
 Works with SQLite (local dev, driver=aiosqlite) and Postgres (production).
-All schema changes are additive — no migrations needed for the hackathon.
+All schema changes are additive, no migrations needed for the hackathon.
 
 Tables:
-  token_sample   — one row per token per sampler tick (or a failure row)
-  quote_probe    — slippage quotes at fixed USD sizes
+  token_sample   : one row per token per sampler tick (or a failure row)
+  quote_probe    : slippage quotes at fixed USD sizes
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class Base(DeclarativeBase):
 class TokenSample(Base):
     """One row per token per sampler tick.
 
-    If the API call failed, `ok=False` and only `error_msg` is populated —
+    If the API call failed, `ok=False` and only `error_msg` is populated,
     every other data field is NULL. The UI shows these gaps honestly.
     """
 
@@ -61,7 +61,7 @@ class TokenSample(Base):
     error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)
     api_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    # Prices — null on failure or when API returns null
+    # Prices: null on failure or when API returns null
     token_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     reference_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     token_to_share_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -108,7 +108,7 @@ class QuoteProbe(Base):
     # Which probe
     probe_usd: Mapped[float] = mapped_column(Float, nullable=False)  # 10, 50, 250
 
-    # Quote result — null if the quote call failed
+    # Quote result: null if the quote call failed
     ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)
     api_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

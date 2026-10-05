@@ -18,24 +18,24 @@ class BinanceAPIError(Exception):
 
 
 class AuthError(BinanceAPIError):
-    """40101 / HTTP 302 / HTTP 401 / non-JSON — Binance API keys missing or rejected."""
+    """40101 / HTTP 302 / HTTP 401 / non-JSON: Binance API keys missing or rejected."""
 
     def __init__(self, code: int = 40101, msg: str = "Binance API keys missing or rejected", *, status_code: int = 401):
         super().__init__(code, msg, status_code=status_code)
 
 
 class SignatureError(AuthError):
-    """40102 — HMAC signature mismatch. Almost always a signing bug."""
+    """40102: HMAC signature mismatch. Almost always a signing bug."""
     pass
 
 
 class TimestampError(BinanceAPIError):
-    """40103 — Clock drift or replay."""
+    """40103: Clock drift or replay."""
     pass
 
 
 class RateLimitError(BinanceAPIError):
-    """42900 — Rate limit exceeded. Retry after `retry_after` seconds."""
+    """42900: Rate limit exceeded. Retry after `retry_after` seconds."""
 
     def __init__(self, code: int, msg: str, *, retry_after: float = 1.0):
         super().__init__(code, msg, status_code=429)
@@ -43,12 +43,12 @@ class RateLimitError(BinanceAPIError):
 
 
 class ChainNotSupportedError(BinanceAPIError):
-    """40411 — Chain ID not in whitelist."""
+    """40411: Chain ID not in whitelist."""
     pass
 
 
 class MarketHoursError(BinanceAPIError):
-    """40367/40369 — Ondo/BStock unavailable outside market hours."""
+    """40367/40369: Ondo/BStock unavailable outside market hours."""
     pass
 
 

@@ -397,17 +397,18 @@ def evaluate_issuer_quote(
     unreliable = not qc.reliable
     if unreliable:
         if sample.token_price is not None and sample.token_price < 1.00:
-            qual_msg = f"{sample.token_symbol} trades at ${sample.token_price:.4f} (under the $1.00 minimum price filter). Data is unreliable — not buying."
+            qual_msg = f"{sample.token_symbol} trades at ${sample.token_price:.4f} (under the $1.00 minimum price filter). Data is unreliable. Not buying."
         elif sample.reference_price is not None and sample.reference_price < 1.00:
-            qual_msg = f"{sample.token_symbol} has a reference price of ${sample.reference_price:.4f} (under the $1.00 minimum). Data is unreliable — not buying."
+            qual_msg = f"{sample.token_symbol} has a reference price of ${sample.reference_price:.4f} (under the $1.00 minimum). Data is unreliable. Not buying."
         elif sample.token_to_share_ratio is not None and (sample.token_to_share_ratio < 0.25 or sample.token_to_share_ratio > 5.0):
             qual_msg = (
-                f"{sample.token_symbol} has a share ratio of {sample.token_to_share_ratio:.4f} shares per token "
-                f"(token price ${(sample.token_price or 0):,.2f} vs ${(sample.reference_price or 0):,.2f} reference), "
-                f"outside the supported 0.25–5.00x limit — not buying."
+                f"{sample.token_symbol} has a share ratio of {sample.token_to_share_ratio:.4f} shares per token, "
+                f"outside the 0.25-5.00x share-ratio range chosen by this tool "
+                f"(quoted price ${(sample.token_price or 0):,.2f} is consistent with the ${(sample.reference_price or 0):,.2f} reference). "
+                f"Not buying."
             )
         elif sample.volume_24h is None or sample.volume_24h < 1_000_000:
-            qual_msg = f"{sample.token_symbol} has only ${(sample.volume_24h or 0):,.0f} in 24-hour volume (under the $1M minimum). Too illiquid — not buying."
+            qual_msg = f"{sample.token_symbol} has only ${(sample.volume_24h or 0):,.0f} in 24-hour volume (under the $1M minimum). Too illiquid. Not buying."
         else:
             qual_msg = f"{sample.token_symbol} failed data quality checks ({qc.reason}). Not buying."
     else:
@@ -468,7 +469,7 @@ def evaluate_issuer_quote(
         vol24 = sample.volume_24h or 0.0
         if vol24 < min_rfq_volume_24h_usd:
             depth_thin = True
-            depth_detail = f"24-hour volume for {sample.token_symbol} on {short_issuer} is only ${vol24:,.0f} (under the $1M minimum). Liquidity is too thin — not buying."
+            depth_detail = f"24-hour volume for {sample.token_symbol} on {short_issuer} is only ${vol24:,.0f} (under the $1M minimum). Liquidity is too thin. Not buying."
         else:
             depth_detail = f"24-hour volume is ${vol24:,.0f} across {pool_count} pools."
     checks.append(RefusalCheck(rule="depth_thin", triggered=depth_thin, detail=depth_detail))
@@ -501,15 +502,19 @@ def evaluate_issuer_quote(
         by_rule = {c.rule: c for c in triggered}
         quote_err_str = ev.quote_error or ""
         is_40374 = "40374" in quote_err_str or "insufficient liquidity" in quote_err_str.lower()
+        is_quarantined = (
+            (sample.token_price is not None and sample.token_price < 1.00)
+            or (sample.reference_price is not None and sample.reference_price < 1.00)
+        )
         if "amount_over_cap" in by_rule:
             ev.refusal_code = "amount_over_cap"
             ev.refusal_reason = by_rule["amount_over_cap"].detail
+        elif is_quarantined and "quality_unreliable" in by_rule:
+            ev.refusal_code = "quality_unreliable"
+            ev.refusal_reason = by_rule["quality_unreliable"].detail
         elif "depth_thin" in by_rule and (is_40374 or not ev.quote_ok or "quality_unreliable" not in by_rule):
             ev.refusal_code = "depth_thin"
-            if "quality_unreliable" in by_rule:
-                ev.refusal_reason = f"{by_rule['depth_thin'].detail}\n{by_rule['quality_unreliable'].detail}"
-            else:
-                ev.refusal_reason = by_rule["depth_thin"].detail
+            ev.refusal_reason = by_rule["depth_thin"].detail
         else:
             ev.refusal_code = triggered[0].rule
             ev.refusal_reason = triggered[0].detail

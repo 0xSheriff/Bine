@@ -15,10 +15,25 @@ import {
 } from '../components/shared'
 import type { ExecuteTradeResponse, QuoteVerdictResponse } from '../types'
 
+function formatSimStatus(status: string | null | undefined) {
+  if (!status) return <span>N/A</span>
+  if (status === 'REQUIRES_APPROVAL') {
+    return (
+      <span
+        title="The dry-run simulates against router 0xB444.... Live swaps through baw use router 0xb300.... See README."
+        className="underline decoration-dotted cursor-help"
+      >
+        Sim router needs allowance
+      </span>
+    )
+  }
+  return <span>{status}</span>
+}
+
 function formatBuyHeadline(q: QuoteVerdictResponse): string {
   const shares = q.shares !== null ? q.shares.toFixed(4) : '0.0000'
   const amt = q.amount_usd.toFixed(2)
-  const allIn = q.all_in_price_per_share !== null ? q.all_in_price_per_share.toFixed(2) : '—'
+  const allIn = q.all_in_price_per_share !== null ? q.all_in_price_per_share.toFixed(2) : 'N/A'
   const spread = q.spread_pct ?? 0
   const absSpread = Math.abs(spread).toFixed(2)
   const dir =
@@ -475,20 +490,20 @@ export default function Home() {
                               </div>
                             </td>
                             <td className="py-2.5 px-3 font-mono">
-                              {row.shares !== null ? row.shares.toFixed(4) : '—'}
+                              {row.shares !== null ? row.shares.toFixed(4) : 'N/A'}
                             </td>
                             <td className="py-2.5 px-3 font-mono">
                               {row.all_in_price_per_share !== null
                                 ? `$${row.all_in_price_per_share.toFixed(2)}`
-                                : '—'}
+                                : 'N/A'}
                             </td>
                             <td className="py-2.5 px-3 font-mono">
                               {row.spread_pct !== null
                                 ? `${row.spread_pct > 0 ? '+' : ''}${row.spread_pct.toFixed(2)}%`
-                                : '—'}
+                                : 'N/A'}
                             </td>
                             <td className="py-2.5 px-3 font-mono">
-                              {row.slippage_pct !== null ? `${row.slippage_pct.toFixed(2)}%` : '—'}
+                              {row.slippage_pct !== null ? `${row.slippage_pct.toFixed(2)}%` : 'N/A'}
                             </td>
                             <td className="py-2.5 px-3 font-mono">
                               {formatCompactUsd(row.depth_usd)}
@@ -531,9 +546,9 @@ export default function Home() {
                     }}
                   >
                     <div>
-                      status: {receipt.simulation.status} · calldata:{' '}
+                      status: {formatSimStatus(receipt.simulation.status)} · calldata:{' '}
                       {receipt.simulation.swap_tx_calldata_bytes} bytes · gas:{' '}
-                      {receipt.simulation.swap_tx_gas_limit || '—'}
+                      {receipt.simulation.swap_tx_gas_limit || 'N/A'}
                     </div>
                     {receipt.simulation.approval_spender && (
                       <div>
@@ -584,7 +599,7 @@ export default function Home() {
                               {d.verdict}
                               {d.recommended_symbol ? ` (${d.recommended_symbol})` : ''}
                             </td>
-                            <td className="py-2 px-3 font-mono">{d.simulation_status || '—'}</td>
+                            <td className="py-2 px-3 font-mono">{formatSimStatus(d.simulation_status)}</td>
                             <td className="py-2 pl-3 font-mono">
                               {d.bsctrace_url ? (
                                 <a

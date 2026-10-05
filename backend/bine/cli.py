@@ -1,4 +1,4 @@
-"""Bine CLI — Pre-trade guard for tokenized stocks on BSC (`chainId="56"`).
+"""Bine CLI: Pre-trade guard for tokenized stocks on BSC (`chainId="56"`).
 
 Usage:
     bine check NVDA 5.50        # One plain-English line (BUY or REFUSE + reason)
@@ -41,7 +41,7 @@ class BackendUnreachableError(RuntimeError):
         super().__init__(
             message
             or (
-                f"Cannot reach Bine backend at {base_url} — start it with: "
+                f"Cannot reach Bine backend at {base_url}. Start it with: "
                 "uvicorn bine.app:app --app-dir backend --port 8000"
             )
         )
@@ -298,7 +298,7 @@ def _cmd_buy(args: argparse.Namespace) -> int:
         print(str(exc))
         return 1
     live_exec = live_result.get("execution") or {}
-    print(f"Execution status: {live_exec.get('status')} — {live_exec.get('detail')}")
+    print(f"Execution status: {live_exec.get('status')}, {live_exec.get('detail')}")
     if live_exec.get("tx_hash"):
         print(f"tx_hash: {live_exec['tx_hash']}")
     if live_exec.get("bsctrace_url"):
@@ -309,7 +309,7 @@ def _cmd_buy(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bine",
-        description="Bine — Pre-trade guard for tokenized stocks on BSC (defaults to BINE_API_URL=http://localhost:8000).",
+        description="Bine: Pre-trade guard for tokenized stocks on BSC (defaults to BINE_API_URL=http://localhost:8000).",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

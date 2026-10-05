@@ -1,1 +1,1 @@
-"""BINE — Tokenized-stock intelligence layer for BSC."""
+"""BINE: Tokenized-stock intelligence layer for BSC."""

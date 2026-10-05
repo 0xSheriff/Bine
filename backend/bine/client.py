@@ -228,7 +228,7 @@ class BinanceClient:
                     latency_ms,
                 )
 
-                # HTTP 429 — rate limit at gateway level
+                # HTTP 429: rate limit at gateway level
                 if resp.status_code == 429:
                     retry_after = float(resp.headers.get("Retry-After", backoff))
                     logger.warning(
@@ -245,7 +245,7 @@ class BinanceClient:
                         42900, "Rate limit exceeded", retry_after=retry_after
                     )
 
-                # 5xx — server error, retry
+                # 5xx: server error, retry
                 if resp.status_code >= 500:
                     logger.warning(
                         "Server error %d (attempt %d/%d)",
@@ -266,7 +266,7 @@ class BinanceClient:
                         status_code=resp.status_code,
                     )
 
-                # Parse response — all Binance responses return JSON
+                # Parse response: all Binance responses return JSON
                 # with business status in the `code` field
                 try:
                     data = resp.json()

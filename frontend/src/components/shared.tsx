@@ -16,7 +16,7 @@ export function formatSecondsAgo(iso: string | null | undefined): string {
 }
 
 export function formatCompactUsd(val: number | null | undefined): string {
-  if (val === null || val === undefined) return '—'
+  if (val === null || val === undefined) return 'N/A'
   if (val >= 1_000_000_000) return `$${(val / 1_000_000_000).toFixed(2)}B`
   if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`
   if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`
@@ -24,7 +24,7 @@ export function formatCompactUsd(val: number | null | undefined): string {
 }
 
 export function shortAddress(addr: string | null | undefined): string {
-  if (!addr) return '—'
+  if (!addr) return 'N/A'
   if (addr.length <= 12) return addr
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }

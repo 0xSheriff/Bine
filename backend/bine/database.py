@@ -33,6 +33,6 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def init_db() -> None:
-    """Create all tables. Safe to call on every startup — only creates if missing."""
+    """Create all tables. Safe to call on every startup, only creates if missing."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

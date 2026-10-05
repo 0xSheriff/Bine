@@ -1,12 +1,12 @@
 """BINE Pre-Trade Guard FastAPI application.
 
 Core Endpoints:
-  GET  /api/quote                 — Frozen Phase 1 pre-trade guard contract (`schema_version: "1"`)
-  POST /api/execute               — Transaction API `/simulate` dry-run + gated Agentic Wallet execution
-  GET  /api/decisions             — Audit trail from `decision_log`
-  GET  /api/decisions/{id}        — Full receipt for a single decision
-  GET  /api/tickers               — Autocomplete list of tokenized stock tickers on BSC (`ondo` + `bstock`)
-  GET  /api/health                — Liveness + configuration summary
+  GET  /api/quote                 : Frozen Phase 1 pre-trade guard contract (`schema_version: "1"`)
+  POST /api/execute               : Transaction API `/simulate` dry-run + gated Agentic Wallet execution
+  GET  /api/decisions             : Audit trail from `decision_log`
+  GET  /api/decisions/{id}        : Full receipt for a single decision
+  GET  /api/tickers               : Autocomplete list of tokenized stock tickers on BSC (`ondo` + `bstock`)
+  GET  /api/health                : Liveness + configuration summary
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ def _configured_cors_origins() -> list[str]:
 
 
 app = FastAPI(
-    title="Bine — Pre-Trade Guard for Tokenized Stocks on BSC",
+    title="Bine: Pre-Trade Guard for Tokenized Stocks on BSC",
     description=(
         "Before a person or an agent buys a tokenized stock on BNB Smart Chain (`chainId=56`), "
         "Bine answers: is it safe right now, what will I really get, and if not, why not."

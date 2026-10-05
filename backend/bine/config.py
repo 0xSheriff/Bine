@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Local Bine backend URL used by the CLI (`bine`) and MCP server (`bine-mcp`)
     bine_api_url: str = "http://localhost:8000"
 
-    # Agent execution — off by default, tiny caps ($6 max so Ondo's $5.50 default works)
+    # Agent execution: off by default, tiny caps ($6 max so Ondo's $5.50 default works)
     bine_live_mode: bool = False
     bine_max_trade_usd: float = 6.00
     bine_daily_cap_usd: float = 10.00
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # Optional: wallet address for quote/simulation when Agentic Wallet is configured
     bine_wallet_address: str = ""
 
-    # BSC mainnet — the only chain this project uses
+    # BSC mainnet: the only chain this project uses
     bsc_chain_id: str = "56"
 
     model_config = {

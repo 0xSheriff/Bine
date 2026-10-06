@@ -21,20 +21,21 @@
 ## 3. Tech Stack
 - **Backend**: Python 3.13 (`.venv`), `fastapi`, `uvicorn`, `sqlalchemy[asyncio]`, `aiosqlite`, `httpx`, `pydantic`, `pydantic-settings`, `pytest`, `pytest-asyncio`, `respx`.
 - **Database**: Optional small SQLite (`./bine.db`) / PostgreSQL database storing `decision_log`.
-- **Frontend**: React 19, Vite 8, TypeScript, Tailwind CSS v4, `@tanstack/react-query`.
+- **Frontend**: React 19, Vite 8, TypeScript, Tailwind CSS v4, `@tanstack/react-query`, `@fontsource-variable/inter` (bundled, zero external font requests), `motion` (`motion/react`), `@paper-design/shaders-react` (`LiquidMetal`).
 - **APIs**: Binance Web3 Wallet REST APIs (`https://web3.binance.com/build`).
 - **Execution**: Binance Agentic Wallet CLI (`@binance/agentic-wallet` v1.10.0, `baw market-order swap` + `baw market-order list`).
 
 ## 4. Current State
-- **Phases 0–9 Complete (except live on-chain swap, which is gated and ready for user execution)**:
+- **Phases 0–9 Complete (plus two verified live `$2.00` `NVDAB` swaps and `ui-redesign` branch)**:
   - **Phase 0**: Reconciled summary contradictions, verified `baw` CLI flags and order lifecycle, proved `SPYon` `$250` `+40.75%` spread across 5/5 runs, and separated `below_issuer_minimum`.
   - **Phase 1**: Frozen `GET /api/quote` `schema_version: "1"` contract with 13 top-level keys, 8 refusal codes, 5 bps tie band (`Either works`), deterministic tiebreak, and any-ticker (`448` tickers including `AAPL`) support.
   - **Phase 2**: Removed background sampler from the live request path; `/api/quote` uses a 60s in-memory `/rwa/tokens` cache; moved sampler to `tools/collect_evidence.py`; simplified `backend/Procfile` and `docs/optional-hosting.md`; removed `/evidence` page.
   - **Phase 3**: Implemented `bine` CLI (`backend/bine/cli.py`), stdio MCP server (`backend/bine/mcp_server.py`), and Binance Wallet Skill (`skills/bine-pre-trade-guard/SKILL.md`).
-  - **Phase 4**: Set default demo amount to `$5.00`, `BINE_MAX_TRADE_USD=6.00`, added `BINE_ADMIN_TOKEN` `403` gate on `execute_live=true`, per-IP sliding-window rate limiting, tightened CORS, and documented approval handling. Live swap remains `UNVERIFIED` pending user wallet funding and command execution.
+  - **Phase 4**: Set default demo amount to `$5.00`, `BINE_MAX_TRADE_USD=6.00`, added `BINE_ADMIN_TOKEN` `403` gate on `execute_live=true`, per-IP sliding-window rate limiting, tightened CORS, and documented approval handling. Live swap verified twice (`Decision #16` and `Decision #18`).
   - **Phase 5 & 6**: Rebuilt `frontend/` into a single-screen pre-trade guard with zero-flash Light & Dark themes (`prefers-color-scheme` + `localStorage['bine-theme']` + sun/moon toggle), plain-English main view, inline dry-run confirm panel, and collapsed `<details>` disclosure.
-  - **Phase 7**: `48/48` `pytest` tests passing (`backend/tests/`), `npm run build` succeeding with 0 TypeScript errors, cold load measured at ~1.5s, and 18 screenshots captured across `390px`, `768px`, and `1440px` in both light and dark themes.
-  - **Phase 8**: Created `docs/devex-facts.md` with 11 verified chronological observations.
+  - **Phase 7**: `51/51` `pytest` tests passing (`backend/tests/`), `npm run build` succeeding with 0 TypeScript errors, cold load measured at ~1.5s, and 24 screenshots captured across `390px`, `768px`, and `1440px` in both light and dark themes.
+  - **Phase 8**: Created `docs/devex-facts.md`, `docs/devex-report-facts.md`, and `docs/devex-report-map.md`.
+  - **UI Redesign (`ui-redesign` branch)**: Completed skin-only frontend redesign matching the IPO-FX layout/typography/pill/hero-art reference and `LiquidMetal` shader logo (`frontend/src/components/BineLogo.tsx`, `frontend/src/components/HeroArt.tsx`, `frontend/src/components/shared.tsx`, `frontend/src/index.css`, and all 4 pages) with zero backend/API/hook/refusal-string changes.
 
 ## 5. Recent Changes
 - **2026-10-02 (Item 1 — State Check & Dead Code Trim)**:
@@ -97,13 +98,14 @@
   - Updated share-ratio refusal copy in `backend/bine/quality.py`, `backend/bine/quote_engine.py`, and `frontend/src/pages/Refusals.tsx` to state the ratio and the supported `0.25–5.00x` limit instead of calling the data unreliable, and prioritized `depth_thin` first when `/api/v1/dex/aggregator/quote` fails with `40374` (`Insufficient liquidity`) with the share-ratio note included on a second line.
   - Ran the US regular-hours quote matrix (`2026-10-05T15:04Z`, `marketStatus = "regular"`, 94 minutes after open / `11:04` New York, saved to `docs/raw/regular_hours_quotes_2026-10-05.jsonl`) and executed the second live `$2.00` `NVDAB` swap (`bine buy NVDA 2 --yes`) with zero hand edits (`DecisionLog #17` dry-run + `DecisionLog #18` live execution, `orderId: 26100500001942767719`, `txHash: 0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75`, BSC Block `125889084`, `docs/live_swap_nvda_2usd_second_2026-10-05.json`).
   - Verified on-chain USDT allowances (`docs/raw/usdt_allowance_2026-10-05.txt`): `allowance(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730, 0xb300000b72DEAEb607a12d5f54773D1C19c7028d)` is `uint256.max - 4 * 10^18` while `allowance(..., 0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5)` is `0`. Updated `run_transaction_dry_run()` in `backend/bine/execution.py` to check `allowance(wallet, 0xb300...)` via BSC RPC when a wallet address is configured (`51/51` pytest tests passing), and created `docs/devex-report-facts.md`.
-- **2026-10-06 (Copy-and-Logic Cleanup & Correction Pass)**:
-  - **Item 1**: Updated `frontend/src/pages/Home.tsx` so `REQUIRES_APPROVAL` displays `"Sim router needs allowance"` with tooltip `"The dry-run simulates against router 0xB444.... Live swaps through baw use router 0xb300.... See README."` wherever simulation status is rendered, while keeping DB/API/JSON values unchanged.
-  - **Item 2 & Item B**: Updated `evaluate_issuer_quote()` in `backend/bine/quote_engine.py` so each refusal returns a single accurate reason: sub-`$1.00` quarantined tokens (e.g. `ENLVon`) return `refusal_code = "quality_unreliable"` with only the quarantine message; non-trading session quote errors (`[40367]`/`[40369]`, e.g. `AAONon`) return `refusal_code = "market_closed"` naming the session and opening countdown (`"AAONon is in a non-trading session (postmarket). Expected to open in 0d 8h 34m. Not buying."`); and non-quarantined tokens failing with `[40374]` or `depth_thin` return `refusal_code = "depth_thin"` with only the liquidity message.
-  - **Item 3 & Item A**: Updated the share-ratio message in `backend/bine/quote_engine.py`, `backend/bine/quality.py`, and `frontend/src/pages/Refusals.tsx` so it states only what the data shows (`"{symbol} has a share ratio of {ratio}. Its token price ${token_price} is {ratio}x the ${reference} per-share reference, as the ratio predicts. Ratios outside 0.25-5.00x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying."`).
-  - **Item C**: Updated `slippage_too_high` in `backend/bine/quote_engine.py` when `exec_spread < 0` (all-in price far below reference, e.g. `NOWon` at `$5.50`) so the message states that the quote implies a fill about `{pct}%` below the reference price, that quotes this far in the buyer's favor usually point to a unit or pricing problem, and that this tool does not trust it.
-  - **Item D**: Documented the `toTokenAmount` unit question for high-ratio tokens (`NOWon`, `CVNAon`, `KLACon`, `PPLTon`) in `docs/devex-report-facts.md` and `docs/friction-log.md`.
-  - **Item 4**: Replaced all em dashes (`—`) across `frontend/src` and `backend/bine` with natural punctuation (`git grep -n "—" -- frontend/src backend/bine` returns 0 matches) and updated `backend/tests/test_quote_engine.py` (`51/51` pytest tests passing, `npm --prefix frontend run build` clean).
+- **2026-10-06 (Copy-and-Logic Cleanup, DevEx Report Map, & `ui-redesign` Branch)**:
+  - **Items 1–4 & A–D on `master`**: Updated `REQUIRES_APPROVAL` display label + tooltip, separated `quality_unreliable` vs `market_closed` (`[40367]`/`[40369]`) vs `depth_thin` (`[40374]`), refined share-ratio and negative-spread `slippage_too_high` messages, removed em dashes (`—`), and created `docs/devex-report-map.md`.
+  - **`ui-redesign` Branch (Skin-Only Frontend Redesign)**:
+    - Added `@fontsource-variable/inter` (bundled, removed external Google Fonts links from `frontend/index.html`), `motion` (`motion/react`), and `@paper-design/shaders-react` (`LiquidMetal`).
+    - Created `frontend/src/assets/bine-mark.svg`, `frontend/src/assets/bine-mark.png` (`512x512` transparent-background white `B` mask), `frontend/public/favicon.svg`, and `frontend/src/components/BineLogo.tsx` (`BineLogoTile` + `BineWordmarkLockup` with `LiquidMetal`, `IntersectionObserver` offscreen pause, and WebGL/reduced-motion CSS fallback).
+    - Created `frontend/src/components/HeroArt.tsx` (2D SVG tilted lavender ring with 3D wall/bevel/shadow + 3D gold coin with rim ridges, embossed `BINE` mark, `offset-path` rolling entrance, `rAF` pointer parallax, and scroll fade).
+    - Updated `frontend/src/index.css`, `frontend/src/components/shared.tsx` (`TopHeader` with `"Check a trade"` pill and `Footer` with circular GitHub/X pills), `frontend/src/App.tsx`, and all 4 pages (`Home.tsx`, `Integrate.tsx`, `Refusals.tsx`, `Receipts.tsx`).
+    - Verified `51/51` pytest tests pass, production build adds `+59.10 kB` JS gzipped (`+61.68 kB` total CSS+JS gzipped, under the `120 kB` budget), `0` em dashes in `frontend/src`, `0` console errors/warnings, `0` external network requests, and 34 screenshots captured across all routes, themes, viewports, and motion sequences.
 
 ## 6. Important Decisions
 - **5 bps Tie Band (`"Either works"`)**: When both issuers are eligible and within 5 bps on all-in price per share, Bine does not claim a price winner; it says `"Either works"` and picks deterministically (deeper AMM liquidity first → lower minimum order → alphabetical).
@@ -116,10 +118,10 @@
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed the 2026-10-06 correction pass (`ITEMS A–D`: accurate share-ratio copy, `[40367]`/`[40369]` `market_closed` session refusal copy, below-reference `slippage_too_high` unit/pricing copy, and high-ratio `toTokenAmount` unit documentation in `docs/devex-report-facts.md` and `docs/friction-log.md`).
+- Completed the skin-only frontend redesign on branch `ui-redesign` (`STEPs 1–10`).
 
 ## 9. Next Steps
-1. Ready for final submission (optional single-service hosting notes in `docs/optional-hosting.md`).
+1. Review `ui-redesign` branch in browser at `http://localhost:5174` (or `http://localhost:5173`) and merge to `master` when approved by user.
 
 ## 10. Important Files
 - `memory.md` — Primary AI context and handoff state.
@@ -128,6 +130,7 @@
 - `docs/friction-log.md` — Empirical friction log with raw API measurements.
 - `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
 - `docs/devex-report-facts.md` — Concise bullet fact sheet of all DevEx findings.
+- `docs/devex-report-map.md` — Form-aligned Developer Experience Report mapping table.
 - `docs/optional-hosting.md` — Optional single-service hosting guide (Phase 2).
 - `docs/dry_run_nvda_2usd.json` — Saved Transaction API dry-run output before live swap.
 - `docs/live_swap_nvda_2usd.json` — Saved first `$2.00` `NVDAB` live swap receipt (`Decision #16`).
@@ -140,6 +143,9 @@
 - `backend/bine/cli.py` — `bine check` and `bine buy` CLI entry point (defaults to `BINE_API_URL=http://localhost:8000`).
 - `backend/bine/mcp_server.py` — Stdio MCP server (`bine_check`, `bine_buy`).
 - `skills/bine-pre-trade-guard/SKILL.md` — Wallet Skill for Binance Agentic Wallet.
+- `frontend/src/components/BineLogo.tsx` — `LiquidMetal` shader logo tile + wordmark lockup with WebGL/reduced-motion fallback.
+- `frontend/src/components/HeroArt.tsx` — 2D SVG lavender ring + 3D gold coin with `offset-path` roll and pointer parallax.
+- `frontend/src/components/shared.tsx` — `TopHeader` (`80px` nav bar) and `Footer` (`Connect` social pills).
 - `frontend/src/pages/Home.tsx` — `/` Pre-trade guard UI.
 - `frontend/src/pages/Integrate.tsx` — `/integrate` copy-paste snippets & schema.
 - `frontend/src/pages/Refusals.tsx` — `/refusals` live API refusal cards.

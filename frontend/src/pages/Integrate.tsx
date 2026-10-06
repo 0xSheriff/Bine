@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TopHeader } from '../components/shared'
+import { Footer, TopHeader } from '../components/shared'
 
 const DEFAULT_API_URL = 'http://localhost:8000'
 
@@ -78,46 +78,54 @@ export default function Integrate() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg)', color: 'var(--text)' }}>
       <TopHeader />
-      <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-5">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Integrate Bine</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-            Copy-paste integration for HTTP clients, shell scripts, MCP agents, and Binance Agentic Wallet skills.
-          </p>
-        </div>
+      <main className="flex-1 w-full py-10 sm:py-14">
+        <div className="bine-container space-y-8">
+          <div className="max-w-3xl space-y-2">
+            <h1 className="bine-section-heading m-0">Integrate Bine</h1>
+            <p className="bine-body m-0" style={{ color: 'var(--text-secondary)' }}>
+              Copy-paste integration for HTTP clients, shell scripts, MCP agents, and Binance Agentic Wallet skills.
+            </p>
+          </div>
 
-        <div className="space-y-4">
-          {SNIPPETS.map(item => (
-            <section
-              key={item.id}
-              className="rounded-lg p-4 sm:p-5 space-y-2.5"
-              style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold">{item.title}</h2>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(item.id, item.code)}
-                  className="px-2.5 py-1 rounded border text-xs font-medium cursor-pointer shrink-0"
+          <div className="space-y-4">
+            {SNIPPETS.map(item => (
+              <section
+                key={item.id}
+                className="bine-card p-5 sm:p-7 space-y-3.5"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-base font-semibold m-0">{item.title}</h2>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(item.id, item.code)}
+                    className="bine-pill-secondary cursor-pointer shrink-0"
+                    style={{
+                      height: '34px',
+                      padding: '0 14px',
+                      fontSize: '12px',
+                      color: copiedId === item.id ? 'var(--good)' : 'var(--text)',
+                    }}
+                  >
+                    {copiedId === item.id ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <pre
+                  className="p-4 rounded-2xl text-xs font-mono overflow-x-auto m-0"
                   style={{
-                    backgroundColor: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    color: copiedId === item.id ? 'var(--good)' : 'var(--text)',
+                    backgroundColor: 'var(--bg-canvas)',
+                    border: '1px solid var(--hairline)',
+                    color: 'var(--text)',
                   }}
                 >
-                  {copiedId === item.id ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-              <pre
-                className="p-3 rounded text-xs font-mono overflow-x-auto m-0"
-                style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
-              >
-                <code>{item.code}</code>
-              </pre>
-            </section>
-          ))}
+                  <code>{item.code}</code>
+                </pre>
+              </section>
+            ))}
+          </div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }
+

@@ -1,6 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { fetchQuote, fetchTickers } from '../api'
-import { TopHeader } from '../components/shared'
+import { Footer, TopHeader, navigateApp } from '../components/shared'
 
 export default function Refusals() {
   const { data: catalog } = useQuery({
@@ -61,62 +61,66 @@ export default function Refusals() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg)', color: 'var(--text)' }}>
       <TopHeader />
-      <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-5">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Live Refusals</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-            Every card below is fetched live from <code>GET /api/quote</code> and the BSC RWA catalog.
-          </p>
-        </div>
+      <main className="flex-1 w-full py-10 sm:py-14">
+        <div className="bine-container space-y-8">
+          <div className="max-w-3xl space-y-2">
+            <h1 className="bine-section-heading m-0">Live Refusals</h1>
+            <p className="bine-body m-0" style={{ color: 'var(--text-secondary)' }}>
+              Every card below is fetched live from <code className="font-mono text-xs">GET /api/quote</code> and the BSC RWA catalog.
+            </p>
+          </div>
 
-        <div className="space-y-3">
-          {specs.map((item, idx) => {
-            const q = quoteResults[idx]?.data
-            const loading = !catalog || quoteResults[idx]?.isLoading
-            const code = q?.refusal?.code || (q?.verdict === 'BUY' ? 'BUY' : 'loading')
-            const msg = q?.refusal?.message || (loading ? 'Querying live API…' : 'No refusal returned.')
-            const runHref = `/?ticker=${encodeURIComponent(item.ticker)}&amount=${encodeURIComponent(String(item.amount))}`
+          <div className="space-y-3">
+            {specs.map((item, idx) => {
+              const q = quoteResults[idx]?.data
+              const loading = !catalog || quoteResults[idx]?.isLoading
+              const code = q?.refusal?.code || (q?.verdict === 'BUY' ? 'BUY' : 'loading')
+              const msg = q?.refusal?.message || (loading ? 'Querying live API…' : 'No refusal returned.')
+              const runHref = `/?ticker=${encodeURIComponent(item.ticker)}&amount=${encodeURIComponent(String(item.amount))}`
 
-            return (
-              <section
-                key={item.key}
-                className="rounded-lg p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
-              >
-                <div className="space-y-1.5 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className="inline-block px-2 py-0.5 rounded text-xs font-mono font-semibold"
-                      style={{
-                        backgroundColor: 'var(--chip-bad-bg)',
-                        color: 'var(--bad)',
-                      }}
-                    >
-                      {code}
-                    </span>
-                    <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
-                      {item.label}
-                    </span>
-                  </div>
-                  <p className="text-sm sm:text-base font-medium m-0">{msg}</p>
-                </div>
-
-                <a
-                  href={runHref}
-                  className="px-3 py-1.5 rounded border text-xs font-semibold no-underline shrink-0 self-start sm:self-center"
-                  style={{
-                    backgroundColor: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text)',
-                  }}
+              return (
+                <section
+                  key={item.key}
+                  className="bine-card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
-                  Run it →
-                </a>
-              </section>
-            )
-          })}
+                  <div className="space-y-2 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span
+                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-semibold"
+                        style={{
+                          backgroundColor: 'var(--chip-bad-bg)',
+                          color: 'var(--bad)',
+                        }}
+                      >
+                        {code}
+                      </span>
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        {item.label}
+                      </span>
+                    </div>
+                    <p className="text-sm sm:text-base font-medium m-0 leading-relaxed">{msg}</p>
+                  </div>
+
+                  <a
+                    href={runHref}
+                    onClick={e => navigateApp(runHref, e)}
+                    className="bine-pill-secondary shrink-0 self-start sm:self-center"
+                    style={{
+                      height: '38px',
+                      padding: '0 16px',
+                      fontSize: '13px',
+                    }}
+                  >
+                    Run it →
+                  </a>
+                </section>
+              )
+            })}
+          </div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }
+

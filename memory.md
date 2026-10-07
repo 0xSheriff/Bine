@@ -43,7 +43,12 @@
       - `PHASE 3` (`03f9b7b`): Built `frontend/src/pages/Home.tsx` (`2.51` screens tall at `1440px`) with Hero, Proof strip, How Bine works, What Bine refuses (`frontend/src/data/recorded-refusals.json`), Verified on BNB Chain (`frontend/src/data/onchain-receipts.json`), and Closing band.
       - `PHASE 4` (`c6f73f7`): Rebuilt `frontend/src/pages/Refusals.tsx` (8-rule legend, 6 recorded refusals from Oct 5 regular + overnight sessions, one-at-a-time `"Run live now"` comparator), `frontend/src/pages/Receipts.tsx` (summary cards, expandable BscScan/BscTrace receipt details with filled vs quoted shares, block number, and BNB gas, empty state via `?empty=1`), and `frontend/src/pages/Integrate.tsx` (WAI-ARIA APG tabs `HTTP`/`CLI`/`MCP`/`Agent skill` with `ArrowLeft`/`ArrowRight`/`Home`/`End`, live `"Try it"` runner, 13-key response table, and `401/403`/`429`/`503` errors table).
       - `PHASE 5` (`d9e4eba`): Executed real headless Chrome CDP pass across all 30 screen/viewport/theme combinations + interactive states (`0` horizontal overflow, `0` undersized tap targets, `0` em dashes, `0` console errors, `0` external network requests, verified `<h1>` route-change focus and keyboard navigation) and updated `docs/ui-audit.md` (`9.2/10` to `9.5/10`).
-      - `PHASE 6`: Added `docs/ui-design-rules.md`, updated `docs/screenshots/*.png`, added `"For judges"` section at the top of `README.md`, and verified all final checks.
+      - `PHASE 6` (`7fd9564`): Added `docs/ui-design-rules.md`, updated `docs/screenshots/*.png`, added `"For judges"` section at the top of `README.md`, and verified all final checks.
+    - **4-Phase Polish Pass (`PHASE A` through `PHASE D` on `ui-redesign`)**:
+      - `PHASE A` (`1a63f46`): Eliminated every displayed underscore (`_`) outside `[data-raw-code]` across all 5 routes via `frontend/src/lib/humanize.ts`, verified `recorded-refusals.json` against `docs/raw/regular_hours_quotes_2026-10-05.jsonl` and `docs/devex-facts.md`, and added `scripts/check_underscores.py` (`TOTAL_UNDERSCORE_OFFENDERS=0`).
+      - `PHASE B` (`42c4010`): Unified header logo, footer logo, and `favicon.svg` onto monochrome silver/chrome (`colorTint="#ffffff"` on `#000000`, frozen `LiquidMetal` at `speed={0}` under `prefers-reduced-motion: reduce`), unified container widths (`max-w-[1240px]`), and verified `0px` logo `x` drift (`100px`) and `0.0000/255` pixel diff via `scripts/verify_logo_and_alignment.py`.
+      - `PHASE C` (`4a68c5c`): Built `frontend/src/components/GlassStack.tsx` and liquid-glass CSS (`.bine-glass-panel` + `.bine-glass-scrim` + `@supports (backdrop-filter: url(#bine-glass))` Chromium SVG refraction + `rAF` specular cursor highlight + `390px` mobile sheet) across all 5 routes (`Home`, `Guard`, `Refusals`, `Receipts`, `Integrate`), keeping the main JS chunk at `485.90 kB` raw (`< 500 kB`).
+      - `PHASE D`: Captured and inspected all 30 `docs/screenshots/glass_<page>_<theme>_<width>.png` screenshots, verified performance traces (`0` long tasks `> 50 ms`) and WCAG 2.2 AA contrast (`> 14:1`), updated `memory.md`, and codified the 4 standing frontend rules in `.agents/skills/bine-ui-standing-rules/SKILL.md`.
 
 ## 5. Recent Changes
 - **2026-10-02 (Item 1 — State Check & Dead Code Trim)**:
@@ -114,15 +119,13 @@
     - Created `frontend/src/components/HeroArt.tsx` (2D SVG tilted lavender ring with 3D wall/bevel/shadow + 3D gold coin with rim ridges, embossed `BINE` mark, `offset-path` rolling entrance, `rAF` pointer parallax, and scroll fade).
     - Updated `frontend/src/index.css`, `frontend/src/components/shared.tsx` (`TopHeader` with `"Check a trade"` pill and `Footer` with circular GitHub/X pills), `frontend/src/App.tsx`, and all 4 pages (`Home.tsx`, `Integrate.tsx`, `Refusals.tsx`, `Receipts.tsx`).
     - Verified `51/51` pytest tests pass, production build adds `+59.10 kB` JS gzipped (`+61.68 kB` total CSS+JS gzipped, under the `120 kB` budget), `0` em dashes in `frontend/src`, `0` console errors/warnings, `0` external network requests, and 34 screenshots captured across all routes, themes, viewports, and motion sequences.
-- **2026-10-07 (`PHASE 0`–`PHASE 6` Frontend Refinement Pass on `ui-redesign`)**:
+- **2026-10-07 (`PHASE 0`–`PHASE 6` Refinement Pass + `PHASE A`–`PHASE D` Polish Pass on `ui-redesign`)**:
   - Tagged `pre-redesign` at `aa3d56f` for rollback safety.
-  - **`PHASE 0` (`b203cc7`)**: Audited all screens via real Chrome CDP across `390px`, `768px`, and `1440px` in light and dark themes and wrote `docs/ui-audit.md`.
-  - **`PHASE 1` (`b58e63f`)**: Split `/` (landing page) and `/guard` (interactive Pre-Trade Guard), set default cold theme to Light, added `LiveModeChip`, and lazy-loaded route pages and `LiquidMetal` so the main JS chunk is `470.93 kB` raw (`< 500 kB`).
-  - **`PHASE 2` (`463e90d`)**: Built `frontend/src/pages/Guard.tsx` (WAI-ARIA APG combobox, 4 presets, 5 plain-English decision metrics, 6 guard checks, ticking quote age, progressive disclosures, 503/network error states) and humanized `market_closed` copy in `backend/bine/quote_engine.py` (`51/51` pytest tests passing).
-  - **`PHASE 3` (`03f9b7b`)**: Rebuilt `frontend/src/pages/Home.tsx` (`2.51` screens tall at `1440px`) and created `frontend/src/data/recorded-refusals.json` and `frontend/src/data/onchain-receipts.json`.
-  - **`PHASE 4` (`c6f73f7`)**: Rebuilt `frontend/src/pages/Refusals.tsx` (8-rule legend, 6 recorded empirical refusals, one-at-a-time `"Run live now"` comparator), `frontend/src/pages/Receipts.tsx` (summary strip, expandable receipt verification rows, `?empty=1` state), and `frontend/src/pages/Integrate.tsx` (WAI-ARIA APG tabs `HTTP`/`CLI`/`MCP`/`Agent skill`, live `"Try it"` runner, 13-key response table, error table).
-  - **`PHASE 5` (`d9e4eba`)**: Executed 30-screenshot + interactive-state Chrome CDP pass (`0` overflow, `0` undersized targets, `0` em dashes, `0` console errors, `0` external requests, verified `<h1>` focus and keyboard navigation) and updated `docs/ui-audit.md` (`9.2/10` to `9.5/10`).
-  - **`PHASE 6`**: Wrote `docs/ui-design-rules.md`, regenerated `docs/screenshots/*.png`, added `"For judges"` section at top of `README.md`, and verified all final checks.
+  - **`PHASE 0`–`PHASE 6` (`b203cc7`..`7fd9564`)**: Audited all screens via Chrome CDP (`docs/ui-audit.md`), split `/` and `/guard`, added WAI-ARIA APG combobox and tabs, rebuilt `Refusals.tsx`, `Receipts.tsx`, and `Integrate.tsx`, added `docs/ui-design-rules.md`, and verified all 30 screen/theme/viewport states.
+  - **`PHASE A` (`1a63f46`)**: Created `frontend/src/lib/humanize.ts` and `scripts/check_underscores.py`, removing all displayed underscores outside `[data-raw-code]` (`TOTAL_UNDERSCORE_OFFENDERS=0`).
+  - **`PHASE B` (`42c4010`)**: Unified `BineLogo.tsx`, `Footer`, and `favicon.svg` on monochrome chrome (`speed={0}` when `prefers-reduced-motion: reduce`), unified `max-w-[1240px]` containers across all 5 pages, and verified `0px` logo `x` drift (`100px`) and `0.0000/255` pixel diff via `scripts/verify_logo_and_alignment.py`.
+  - **`PHASE C` (`4a68c5c`)**: Created `frontend/src/components/GlassStack.tsx` and `.bine-glass-panel` / `.bine-glass-scrim` CSS with SVG refraction and cursor specular highlight across all 5 routes; verified `0` long tasks `> 50 ms`, `> 14:1` contrast, `0` overflow failures, and `485.90 kB` main JS chunk via `scripts/verify_glass_and_perf.py`.
+  - **`PHASE D`**: Captured and inspected all 30 `docs/screenshots/glass_*.png` files, updated `memory.md`, and created `.agents/skills/bine-ui-standing-rules/SKILL.md`.
 
 ## 6. Important Decisions
 - **5 bps Tie Band (`"Either works"`)**: When both issuers are eligible and within 5 bps on all-in price per share, Bine does not claim a price winner; it says `"Either works"` and picks deterministically (deeper AMM liquidity first → lower minimum order → alphabetical).
@@ -135,16 +138,20 @@
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed the 7-phase frontend refinement pass (`PHASE 0` through `PHASE 6`) on branch `ui-redesign`.
+- Completed both the 7-phase frontend refinement pass (`PHASE 0`–`PHASE 6`) and the 4-phase polish pass (`PHASE A`–`PHASE D`) on branch `ui-redesign`.
 
 ## 9. Next Steps
-1. Review `ui-redesign` branch in browser at `http://localhost:5174` (or `http://localhost:5173`) and merge to `master` when approved by user.
+1. Review `ui-redesign` branch in browser at `http://localhost:5174` and merge to `master` when approved by user.
 
 ## 10. Important Files
 - `memory.md` — Primary AI context and handoff state.
 - `README.md` — Root documentation (`For judges` section, 3-command quickstart, and safety defaults).
-- `docs/ui-audit.md` — Phase 0 baseline and Phase 5 post-refinement UI audit with per-screen scores.
+- `docs/ui-audit.md` — Phase 0 baseline, Phase 5 post-refinement, and Phase C liquid-glass UI audit with performance traces.
 - `docs/ui-design-rules.md` — Frontend design rules, tokens, typography, and component patterns.
+- `.agents/skills/bine-ui-standing-rules/SKILL.md` — Workspace skill enforcing the 4 standing frontend UI rules.
+- `scripts/check_underscores.py` — Automated CDP underscore scanner across all routes/themes/states.
+- `scripts/verify_logo_and_alignment.py` — Automated CDP logo `x`-coordinate and pixel-diff verifier.
+- `scripts/verify_glass_and_perf.py` — Automated CDP liquid-glass screenshot, contrast, overflow, and performance trace verifier.
 - `docs/PROJECT_BRIEF.md` — Original brief.
 - `docs/friction-log.md` — Empirical friction log with raw API measurements.
 - `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
@@ -162,14 +169,16 @@
 - `backend/bine/cli.py` — `bine check` and `bine buy` CLI entry point (defaults to `BINE_API_URL=http://localhost:8000`).
 - `backend/bine/mcp_server.py` — Stdio MCP server (`bine_check`, `bine_buy`).
 - `skills/bine-pre-trade-guard/SKILL.md` — Wallet Skill for Binance Agentic Wallet.
-- `frontend/src/components/BineLogo.tsx` — `LiquidMetal` shader logo tile + wordmark lockup with WebGL/reduced-motion fallback.
+- `frontend/src/lib/humanize.ts` — Plain-English formatter for refusal codes, statuses, depth sources, field keys, and `GUARD_RULE_DEFINITIONS`.
+- `frontend/src/components/BineLogo.tsx` — `LiquidMetal` shader logo tile + wordmark lockup with monochrome chrome fallback and frozen `speed={0}` reduced-motion support.
+- `frontend/src/components/GlassStack.tsx` — `BineGlassFilterDef`, `GlassDetailPanel`, and `GlassStack` liquid-glass interactive card system.
 - `frontend/src/components/HeroArt.tsx` — 2D SVG lavender ring + 3D gold coin with `offset-path` roll and pointer parallax.
 - `frontend/src/components/shared.tsx` — `TopHeader` (`80px` nav bar, `LiveModeChip`, route-change `<h1>` focus) and `Footer` (`Connect` social pills).
-- `frontend/src/pages/Home.tsx` — `/` 2.5-screen Landing page.
-- `frontend/src/pages/Guard.tsx` — `/guard` Interactive Pre-Trade Guard with WAI-ARIA APG combobox and dry-run simulation.
-- `frontend/src/pages/Refusals.tsx` — `/refusals` 8-rule legend, 6 recorded refusals, and one-at-a-time live runner.
-- `frontend/src/pages/Receipts.tsx` — `/receipts` verified on-chain receipts with expandable BscScan / BscTrace verification details.
-- `frontend/src/pages/Integrate.tsx` — `/integrate` WAI-ARIA APG tabbed reference (`HTTP`, `CLI`, `MCP`, `Agent skill`) with live `"Try it"` runner.
+- `frontend/src/pages/Home.tsx` — `/` 2.5-screen Landing page with interactive glass proof strip and how-it-works cards.
+- `frontend/src/pages/Guard.tsx` — `/guard` Interactive Pre-Trade Guard with WAI-ARIA APG combobox, glass metric tiles, and glass guard-rule checks.
+- `frontend/src/pages/Refusals.tsx` — `/refusals` 8-rule interactive glass table, 6 recorded refusal glass cards, and one-at-a-time live runner.
+- `frontend/src/pages/Receipts.tsx` — `/receipts` verified on-chain receipts with expandable liquid-glass verification details.
+- `frontend/src/pages/Integrate.tsx` — `/integrate` WAI-ARIA APG tabbed reference (`HTTP`, `CLI`, `MCP`, `Agent skill`), live `"Try it"` runner, and interactive glass response field table.
 - `frontend/src/data/recorded-refusals.json` — Recorded Oct 5 regular-hours and overnight refusal samples.
 - `frontend/src/data/onchain-receipts.json` — Verified BNB Chain swap receipts (`Decision #16` and `Decision #18`).
 
@@ -187,3 +196,4 @@
 - **Minimal, decision-driving, plug-and-play**: No dashboards, charts, chat, notifications, or speculative metrics.
 - **Never fabricate or interpolate data**: Only verified numbers and errors.
 - **Never expose secrets**: API keys stay server-side and never appear in logs or responses.
+- **Follow `.agents/skills/bine-ui-standing-rules/SKILL.md`**: Zero displayed underscores outside `[data-raw-code]`, identical monochrome `BineWordmarkLockup` in header and footer aligned at `100px` (`1440px`), `.bine-glass-scrim` contrast layer inside every `.bine-glass-panel`, and real-browser CDP verification before every frontend commit.

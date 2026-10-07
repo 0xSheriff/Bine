@@ -296,11 +296,11 @@ def main() -> int:
                             break
                         time.sleep(0.2)
 
-                    # Ensure one glass panel is open on every page
+                    # Ensure one glass panel is open on every page and scroll it into the viewport
                     cdp.eval_js(
                         """
                         (() => {
-                          const existing = document.querySelector('[data-glass-panel]');
+                          let existing = document.querySelector('[data-glass-panel]');
                           if (!existing) {
                             const trigger = document.querySelector('.bine-glass-trigger');
                             if (trigger) trigger.click();
@@ -308,7 +308,18 @@ def main() -> int:
                         })()
                         """
                     )
-                    time.sleep(0.45)
+                    time.sleep(0.35)
+                    cdp.eval_js(
+                        """
+                        (() => {
+                          const panel = document.querySelector('[data-glass-panel]');
+                          if (panel) {
+                            panel.scrollIntoView({ block: 'center', behavior: 'instant' });
+                          }
+                        })()
+                        """
+                    )
+                    time.sleep(0.25)
 
                     check = cdp.eval_js(
                         """

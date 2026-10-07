@@ -129,7 +129,8 @@
   - **`PHASE C` (`4a68c5c`)**: Created `frontend/src/components/GlassStack.tsx` and `.bine-glass-panel` / `.bine-glass-scrim` CSS with SVG refraction and cursor specular highlight across all 5 routes; verified `0` long tasks `> 50 ms`, `> 14:1` contrast, `0` overflow failures, and `485.90 kB` main JS chunk via `scripts/verify_glass_and_perf.py`.
   - **`PHASE D` (`7b967ce`)**: Captured and inspected all 30 `docs/screenshots/glass_*.png` files, updated `memory.md`, and created `.agents/skills/bine-ui-standing-rules/SKILL.md`.
   - **`PHASE E` (`2c3ce6e`)**: Removed default-open panel states across `Guard.tsx`, `Refusals.tsx`, `Receipts.tsx`, and `Integrate.tsx`; updated `scripts/verify_glass_and_perf.py` to open panels via real clicks (`initial_panel_open: false`, `glass_panel_opened: true`), decode PNG screenshots to compute sRGB WCAG contrast ratios against worst-case backdrop pixels including the lavender ring, and re-capture all 30 `glass_*.png` screenshots; verified `RESPONSE_FIELDS`, `GUARD_RULE_DEFINITIONS` (`0.25x-5.00x`), and `recorded-refusals.json` source lines; extended `scripts/check_underscores.py`; lazy-loaded `HeroArt` so main JS chunk is `477.58 kB` raw (`<= 480 kB`); and updated `memory.md` and `.agents/skills/bine-ui-standing-rules/SKILL.md`.
-  - **`PHASE F`**: Added `scripts/verify_rules_truth_table.py` (`8/8` `MATCH` rows, `0` hard-coded rule/refusal counts); mounted `<BineGlassFilterDef />` only while a glass panel is open, gated offscreen `BineLogoTile` shader initialization, and reserved `aspect-[900/680]` on mobile `<HeroArt />` (`75` vs `75` median Lighthouse Performance on `/` and `82` vs `81` on `/guard?ticker=NVDA&amount=5.5` across `:4173` vs `:4174`); styled `.bine-glass-panel` (`0.50` outer tint) and `.bine-glass-scrim` (`0.82` inner contrast plate, `>= 5.84:1` plate-only and `>= 6.89:1` plate-in-glass WCAG contrast); verified `glass_open=True` on `guard_refuse` and `guard_below_min` in `scripts/check_underscores.py` (`TOTAL_UNDERSCORE_OFFENDERS=0`); verified `0px` logo `x` drift (`scripts/verify_logo_and_alignment.py`); and updated `.agents/skills/bine-ui-standing-rules/SKILL.md` with `"Derive counts from data, never hard-code them"`.
+  - **`PHASE F` (`76a6ca8`)**: Added `scripts/verify_rules_truth_table.py` (`8/8` `MATCH` rows, `0` hard-coded rule/refusal counts); mounted `<BineGlassFilterDef />` only while a glass panel is open, gated offscreen `BineLogoTile` shader initialization, and reserved `aspect-[900/680]` on mobile `<HeroArt />` (`75` vs `75` median Lighthouse Performance on `/` and `82` vs `81` on `/guard?ticker=NVDA&amount=5.5` across `:4173` vs `:4174`); styled `.bine-glass-panel` (`0.50` outer tint) and `.bine-glass-scrim` (`0.82` inner contrast plate, `>= 5.84:1` plate-only and `>= 6.89:1` plate-in-glass WCAG contrast); verified `glass_open=True` on `guard_refuse` and `guard_below_min` in `scripts/check_underscores.py` (`TOTAL_UNDERSCORE_OFFENDERS=0`); verified `0px` logo `x` drift (`scripts/verify_logo_and_alignment.py`); and updated `.agents/skills/bine-ui-standing-rules/SKILL.md` with `"Derive counts from data, never hard-code them"`.
+  - **DevEx Evidence Ledger (`docs/devex-evidence.md`)**: Produced `docs/devex-evidence.md` (`196` lines, every line sourced to `file:line` or `URL#heading`, zero prose, zero em dashes, each finding marked `VERIFIED` or `AGENT-REPORTED`) and `docs/raw/endpoint_latency_15_runs_2026-10-07.jsonl` (`75` sequential read-only latency calls, `3s` apart, `0` HTTP `429`s).
 
 ## 6. Important Decisions
 - **5 bps Tie Band (`"Either works"`)**: When both issuers are eligible and within 5 bps on all-in price per share, Bine does not claim a price winner; it says `"Either works"` and picks deterministically (deeper AMM liquidity first → lower minimum order → alphabetical).
@@ -142,7 +143,7 @@
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed both the 7-phase frontend refinement pass (`PHASE 0`–`PHASE 6`) and the 6-phase polish & verification pass (`PHASE A`–`PHASE F`) on branch `ui-redesign`.
+- Completed both the 7-phase frontend refinement pass (`PHASE 0`–`PHASE 6`), the 6-phase polish & verification pass (`PHASE A`–`PHASE F`), and the verified DevEx evidence ledger (`docs/devex-evidence.md`) on branch `ui-redesign`.
 
 ## 9. Next Steps
 1. Review `ui-redesign` branch in browser at `http://localhost:5174` and merge to `master` when approved by user.
@@ -150,6 +151,8 @@
 ## 10. Important Files
 - `memory.md` — Primary AI context and handoff state.
 - `README.md` — Root documentation (`For judges` section, 3-command quickstart, and safety defaults).
+- `docs/devex-evidence.md` — Line-sourced, zero-prose evidence ledger (`VERIFIED` vs `AGENT-REPORTED`) covering all endpoints, `llms.txt`/`llms-full.txt` vs SPA docs, RWA Data schemas, verbatim errors, latencies, rate limits, and all recorded quotes.
+- `docs/raw/endpoint_latency_15_runs_2026-10-07.jsonl` — Raw 15-call sequential read-only latency measurements (`3s` apart) across `/rwa/tokens` (`ondo` & `bstock`), `/token/top-liquidity`, and `/aggregator/quote`.
 - `docs/ui-audit.md` — Phase 0 baseline, Phase 5 post-refinement, and Phase C–F liquid-glass, Fair Lighthouse, and sRGB WCAG plate-contrast audit.
 - `docs/ui-design-rules.md` — Frontend design rules, tokens, typography, and component patterns.
 - `.agents/skills/bine-ui-standing-rules/SKILL.md` — Workspace skill enforcing the 5 standing frontend UI and verification rules.

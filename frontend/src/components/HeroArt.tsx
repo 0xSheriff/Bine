@@ -89,10 +89,10 @@ export function HeroArt() {
         className="w-full h-full flex items-center justify-end will-change-transform"
       >
         <svg
-          viewBox="0 0 860 640"
+          viewBox="-20 -30 900 680"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="w-[115%] max-w-none h-auto overflow-visible"
+          className="w-[104%] max-w-[780px] h-auto overflow-visible"
         >
           <defs>
             {/* Ring lavender surface gradient (#D6D5E6 to #B9B8CF) */}

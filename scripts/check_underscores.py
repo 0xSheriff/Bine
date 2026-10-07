@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
 Verify that zero underscore characters ('_') appear in any visible text node,
-aria-label, title, placeholder, alt text, or document.title across all 5 routes
-and interactive states (light & dark), excluding [data-raw-code] blocks.
-Uses standard-library RFC 6455 WebSocket client over Chrome DevTools Protocol.
+aria-label, title tooltip, placeholder, alt text, or document.title across all
+routes and interactive states (light & dark), excluding [data-raw-code] blocks.
+Covers:
+- Open glass panel ([data-glass-panel]) on every route (/, /guard, /refusals, /receipts, /integrate)
+- Expanded receipt row on /receipts
+- Developers "Try it" live result on /integrate
+- Every title tooltip and aria-label attribute
 """
 
 import base64
@@ -167,42 +171,66 @@ SCAN_JS = r"""
     return true;
   };
 
-  // Walk text nodes
+  let textNodesScanned = 0;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) {
     const text = (node.nodeValue || '').trim();
-    if (!text || !text.includes('_')) continue;
+    if (!text) continue;
     const parent = node.parentElement;
     if (!parent) continue;
     if (isInsideRawCode(parent)) continue;
     if (!isVisible(parent)) continue;
-    offenders.push({
-      kind: 'text',
-      value: text.slice(0, 140),
-      tag: parent.tagName.toLowerCase(),
-      className: (parent.className || '').toString().slice(0, 80),
-    });
+    textNodesScanned += 1;
+    if (text.includes('_')) {
+      offenders.push({
+        kind: 'text',
+        value: text.slice(0, 140),
+        tag: parent.tagName.toLowerCase(),
+        className: (parent.className || '').toString().slice(0, 80),
+      });
+    }
   }
 
-  // Check attributes on all elements
   const attrs = ['aria-label', 'title', 'placeholder', 'alt'];
+  let titlesScanned = 0;
+  let ariaLabelsScanned = 0;
   const allElements = document.querySelectorAll('*');
   for (const el of allElements) {
     if (isInsideRawCode(el)) continue;
     for (const attr of attrs) {
       const val = el.getAttribute(attr);
-      if (val && val.includes('_')) {
-        offenders.push({
-          kind: `attr:${attr}`,
-          value: val.slice(0, 140),
-          tag: el.tagName.toLowerCase(),
-        });
+      if (val !== null && val !== '') {
+        if (attr === 'title') titlesScanned += 1;
+        if (attr === 'aria-label') ariaLabelsScanned += 1;
+        if (val.includes('_')) {
+          offenders.push({
+            kind: `attr:${attr}`,
+            value: val.slice(0, 140),
+            tag: el.tagName.toLowerCase(),
+          });
+        }
       }
     }
   }
 
-  return offenders;
+  const glassPanel = document.querySelector('[data-glass-panel]');
+  const tryItLive = Boolean(
+    Array.from(document.querySelectorAll('span')).find(
+      s => (s.textContent || '').includes('Live response for NVDA')
+    )
+  );
+  const receiptExpanded = Boolean(document.querySelector('[id^="receipt-details-"]'));
+
+  return {
+    offenders,
+    textNodesScanned,
+    titlesScanned,
+    ariaLabelsScanned,
+    glassPanelOpen: Boolean(glassPanel),
+    tryItLive,
+    receiptExpanded,
+  };
 })()
 """
 
@@ -270,7 +298,16 @@ def main() -> int:
             for name, path in states:
                 url = f"{BASE_URL}{path}"
                 cdp.send("Page.navigate", {"url": url})
-                time.sleep(1.0)
+                # Wait for route content & triggers
+                for _ in range(25):
+                    ready = cdp.eval_js(
+                        "Boolean(document.querySelector('.bine-glass-trigger') || document.querySelector('h1'))"
+                    )
+                    if ready and ("amount=" not in path or cdp.eval_js("Boolean(document.querySelector('.bine-glass-trigger'))")):
+                        break
+                    time.sleep(0.2)
+                time.sleep(0.3)
+
                 cdp.eval_js(
                     f"""
                     (() => {{
@@ -279,8 +316,21 @@ def main() -> int:
                     }})()
                     """
                 )
+
+                # Open a glass panel on every route that has .bine-glass-trigger
+                cdp.eval_js(
+                    """
+                    (() => {
+                      const trigger = document.querySelector('.bine-glass-trigger');
+                      if (trigger && !document.querySelector('[data-glass-panel]')) {
+                        trigger.click();
+                      }
+                    })()
+                    """
+                )
+                time.sleep(0.3)
+
                 if name == "guard_buy":
-                    time.sleep(1.5)
                     cdp.eval_js(
                         """
                         (() => {
@@ -293,13 +343,11 @@ def main() -> int:
                     )
                     time.sleep(1.8)
                 elif name in ("guard_refuse", "guard_below_min"):
-                    time.sleep(1.5)
                     cdp.eval_js(
                         "document.querySelectorAll('details').forEach(d => d.open = true);"
                     )
                     time.sleep(0.3)
                 elif name == "refusals":
-                    time.sleep(0.8)
                     cdp.eval_js(
                         """
                         (() => {
@@ -310,21 +358,22 @@ def main() -> int:
                         })()
                         """
                     )
-                    time.sleep(1.5)
+                    time.sleep(1.6)
                 elif name == "receipts":
-                    time.sleep(0.8)
                     cdp.eval_js(
                         """
                         (() => {
-                          Array.from(document.querySelectorAll('button')).forEach(b => {
-                            if ((b.textContent || '').includes('Show details')) b.click();
-                          });
+                          if (!document.querySelector('[data-glass-panel]')) {
+                            const btn = Array.from(document.querySelectorAll('button')).find(
+                              b => (b.textContent || '').includes('Show details')
+                            );
+                            if (btn) btn.click();
+                          }
                         })()
                         """
                     )
                     time.sleep(0.4)
                 elif name == "integrate":
-                    time.sleep(0.6)
                     cdp.eval_js(
                         """
                         (() => {
@@ -335,10 +384,28 @@ def main() -> int:
                         })()
                         """
                     )
-                    time.sleep(1.4)
+                    # Wait for "Live response for NVDA" to appear
+                    for _ in range(25):
+                        if cdp.eval_js(
+                            "Boolean(Array.from(document.querySelectorAll('span')).find(s => (s.textContent || '').includes('Live response for NVDA')))"
+                        ):
+                            break
+                        time.sleep(0.2)
+                    time.sleep(0.2)
 
-                offenders = cdp.eval_js(SCAN_JS) or []
-                print(f"[{theme}] {name} ({path}): {len(offenders)} underscore(s)")
+                scan = cdp.eval_js(SCAN_JS) or {}
+                offenders = scan.get("offenders", [])
+                extra = (
+                    f"glass_open={scan.get('glassPanelOpen')} "
+                    f"text_nodes={scan.get('textNodesScanned')} "
+                    f"titles={scan.get('titlesScanned')} "
+                    f"aria_labels={scan.get('ariaLabelsScanned')}"
+                )
+                if name == "receipts":
+                    extra += f" receipt_expanded={scan.get('receiptExpanded')}"
+                if name == "integrate":
+                    extra += f" try_it_live={scan.get('tryItLive')}"
+                print(f"[{theme}] {name} ({path}): {len(offenders)} underscore(s) ({extra})")
                 for off in offenders:
                     total_offenders += 1
                     print(f"  OFFENDER: {json.dumps(off)}")

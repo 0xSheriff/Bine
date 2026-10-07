@@ -40,9 +40,13 @@ Activate this skill whenever creating, editing, or auditing frontend code (`fron
 
 ### 4. Real-Browser CDP Verification Before Every Frontend Commit
 - **Rule**: Reading source code does not count as a UI audit. Every frontend change must be inspected in a real headless Chrome session via CDP across `390px`, `768px`, and `1440px` in both Light and Dark modes before committing.
+- **Anti-Rigging & Evidence Rules**:
+  - Never default a UI to open just to satisfy a test.
+  - Never report a check as verified unless the script computes it.
 - **Verification Checklist**:
   1. `backend/.venv/bin/python scripts/check_underscores.py` -> `TOTAL_UNDERSCORE_OFFENDERS=0`
   2. `backend/.venv/bin/python scripts/verify_logo_and_alignment.py` -> `0px` logo `x` drift and identical nav/footer tile rendering
-  3. `backend/.venv/bin/python scripts/verify_glass_and_perf.py` -> `OVERFLOW_FAILURES=0`, `0` long tasks `> 50 ms`, and 30 `glass_<page>_<theme>_<width>.png` screenshots captured and visually inspected
+  3. `backend/.venv/bin/python scripts/verify_glass_and_perf.py` -> `OVERFLOW_FAILURES=0`, `CONTRAST_FAILURES=0`, `initial_panel_open: false`, `glass_panel_opened: true`, `0` long tasks `> 50 ms`, and 30 `glass_<page>_<theme>_<width>.png` screenshots captured from real clicks and visually inspected
   4. `grep -rn "—" frontend/src/` -> `0` matches
-  5. `npm --prefix frontend run build` -> main JS chunk `< 500 kB` raw
+  5. `npm --prefix frontend run build` -> main JS chunk `<= 480 kB` raw
+

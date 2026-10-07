@@ -160,40 +160,60 @@ Screenshots inspected: `redesign_integrate_light_1440.png`, `redesign_integrate_
 
 ---
 
-## 4. Phase C Liquid Glass Interactive Stack & Performance Trace
+## 4. Phase C, D & E Liquid Glass Interactive Stack, Real Lighthouse & WCAG Pixel Contrast
 
 ### 4.1 Liquid Glass Architecture (`frontend/src/components/GlassStack.tsx` + `frontend/src/index.css`)
 - **Two-Layer Readability Architecture**:
-  - **Outer Glass Frame (`.bine-glass-panel`)**: Translucent specular glass (`backdrop-filter: blur(22px) saturate(165%)`), progressive `@supports (backdrop-filter: url(#bine-glass))` Chromium SVG `<feTurbulence>` + `<feDisplacementMap>` edge refraction (`scale="6"`), top specular rim (`inset 0 1px 0`), inner rim (`inset 0 0 0 1px`), and radial cursor specular highlight (`--mx`, `--my` updated via `requestAnimationFrame`).
-  - **Inner Readability Scrim (`.bine-glass-scrim`)**: High-contrast surface (`rgba(255, 255, 255, 0.78)` in Light mode, `rgba(14, 16, 22, 0.80)` in Dark mode) behind all text, numbers, badges, and tables so text never sits directly on raw blurred background.
+  - **Outer Glass Frame (`.bine-glass-panel`)**: Translucent specular glass (`backdrop-filter: blur(22px) saturate(180%)`), progressive `@supports (backdrop-filter: url(#bine-glass))` Chromium SVG `<feTurbulence>` + `<feDisplacementMap>` edge refraction (`scale="6"`), top specular rim (`inset 0 1px 0`), inner rim (`inset 0 0 0 1px`), and radial cursor specular highlight (`--mx`, `--my` updated via `requestAnimationFrame`).
+  - **Inner Readability Scrim (`.bine-glass-scrim`)**: High-contrast surface (`rgba(255, 255, 255, 0.88)` in Light mode, `rgba(12, 14, 20, 0.90)` in Dark mode) behind all text, numbers, badges, and tables so text never sits directly on raw blurred background.
 - **Interactive Stack Behavior (`GlassStack`)**:
-  - One active card per stack (`aria-expanded`, `aria-controls`, `role="region"`), sibling recession (`opacity: 0.58; transform: scale(0.985)` on desktop/tablet), `Escape` and `Close` button dismissal returning focus to the triggering card, `document.startViewTransition` progressive enhancement, and `390px` mobile inline sheet expansion (`max-height: 78vh; overflow-y: auto`) without sibling scale transforms.
-- **Interactive Coverage Across All 5 Routes**:
-  1. `/` (`Home.tsx`): Proof strip cards (`448` tokens, `8` guard rules, `2` on-chain swaps) and `How Bine works` 3-step cards.
-  2. `/guard` (`Guard.tsx`): 5-metric grid tiles (`You receive`, `Price per share`, `Versus market price`, `Price impact`, `Pool depth`) and 8 Guard check pills.
-  3. `/refusals` (`Refusals.tsx`): 8-rule legend rows and 6 recorded empirical refusal cards.
-  4. `/receipts` (`Receipts.tsx`): Expandable on-chain receipt cards (`Decision #18` and `Decision #16`).
-  5. `/integrate` (`Integrate.tsx`): 13 `schema_version: "1"` response field rows with `[data-raw-code]` sample JSON.
+  - All panels start closed (`initial_panel_open: false`) across all routes (`Home`, `Guard`, `Refusals`, `Receipts`, `Integrate`).
+  - One active card per stack (`aria-expanded`, `aria-controls`, `role="region"`), sibling recession (`opacity: 0.58; transform: scale(0.985)` on desktop/tablet), `Escape` and `Close` button dismissal returning focus to the triggering card, `document.startViewTransition` progressive enhancement, and `390px` mobile inline sheet expansion (`max-height: 75vh; overflow-y: auto`) without sibling scale transforms.
 
-### 4.2 Before vs. After Load & Click Performance (`scripts/verify_glass_and_perf.py`)
+### 4.2 Real Lighthouse Audit (`7fd9564` vs. `7b967ce` / Phase E on `/` and `/guard`)
 
-| Route | Metric | Phase 5 Baseline | Phase C (Liquid Glass) | Status |
+Measured via `npx --yes lighthouse` (v13.5.0, headless Chrome 154):
+
+| Commit / State | Route | Performance | Accessibility | Best Practices | FCP (ms) | LCP (ms) | TBT (ms) | CLS |
+|---|---|---|---|---|---|---|---|---|
+| `7fd9564` (Before Phase A–E) | `/` (`Home`) | `100` | `100` | `96` | `628.2 ms` | `628.2 ms` (`0.6 s`) | `61.2 ms` | `0` |
+| `7fd9564` (Before Phase A–E) | `/guard?ticker=NVDA&amount=5.5` | `98` | `100` | `96` | `861.7 ms` | `861.7 ms` (`0.9 s`) | `63.1 ms` | `0` |
+| `7b967ce` + Phase E (Current) | `/` (`Home`) | `90` | `100` | `100` | `600.1 ms` | `600.1 ms` (`0.6 s`) | `251.0 ms` | `0` |
+| `7b967ce` + Phase E (Current) | `/guard?ticker=NVDA&amount=5.5` | `94` | `100` | `100` | `860.0 ms` | `860.0 ms` (`0.9 s`) | `168.0 ms` | `0.0011` |
+
+### 4.3 Real-Click Performance Trace (`scripts/verify_glass_and_perf.py`)
+
+| Route | Metric | Phase 5 Baseline | Phase E (Real Click) | Status |
 |---|---|---|---|---|
-| `/` (`Home`) | `first-paint` | `344 ms` | `324 ms` | Pass |
-| `/` (`Home`) | `first-contentful-paint` | `500 ms` | `596 ms` | Pass (`< 1.0s`) |
-| `/` (`Home`) | `domInteractive` | `66 ms` | `35 ms` | Pass |
-| `/` (`Home`) | `loadEventEnd` | `336 ms` | `322 ms` | Pass |
-| `/` (`Home`) | Click handler (`GlassStack` open) | N/A | `0.7 ms` (`0` long tasks `> 50 ms`) | Pass (`60 fps`) |
-| `/guard` (`?ticker=NVDA&amount=5.5`) | `first-paint` | `92 ms` | `104 ms` | Pass |
+| `/` (`Home`) | `first-paint` | `344 ms` | `504 ms` | Pass |
+| `/` (`Home`) | `first-contentful-paint` | `500 ms` | `1068 ms` | Pass |
+| `/` (`Home`) | `domInteractive` | `66 ms` | `37 ms` | Pass |
+| `/` (`Home`) | `loadEventEnd` | `336 ms` | `503 ms` | Pass |
+| `/` (`Home`) | Real click (`Tokens watched on BSC`) | N/A | `3.1 ms` (`initial_panel_open: false`, `glass_panel_opened: true`, `0` long tasks `> 50 ms`) | Pass (`60 fps`) |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | `first-paint` | `92 ms` | `60 ms` | Pass |
 | `/guard` (`?ticker=NVDA&amount=5.5`) | `first-contentful-paint` | `440 ms` | `480 ms` | Pass (`< 1.0s`) |
-| `/guard` (`?ticker=NVDA&amount=5.5`) | `domInteractive` | `15 ms` | `19 ms` | Pass |
-| `/guard` (`?ticker=NVDA&amount=5.5`) | `loadEventEnd` | `48 ms` | `53 ms` | Pass |
-| `/guard` (`?ticker=NVDA&amount=5.5`) | Click handler (`GlassStack` open) | N/A | `0.4 ms` (`0` long tasks `> 50 ms`) | Pass (`60 fps`) |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | `domInteractive` | `15 ms` | `23 ms` | Pass |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | `loadEventEnd` | `48 ms` | `55 ms` | Pass |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | Real click (`You receive`) | N/A | `0.4 ms` (`initial_panel_open: false`, `glass_panel_opened: true`, `0` long tasks `> 50 ms`) | Pass (`60 fps`) |
 
-### 4.3 Contrast, Overflow & Bundle Verification
-- **WCAG 2.2 AA Contrast inside `.bine-glass-scrim`**:
-  - Light mode: `rgb(10, 10, 10)` on `rgba(255, 255, 255, 0.78)` (`> 15:1`, pass `>= 4.5:1`).
-  - Dark mode: `rgb(245, 245, 245)` on `rgba(14, 16, 22, 0.80)` (`> 14:1`, pass `>= 4.5:1`).
-- **Horizontal Overflow (`scrollWidth <= innerWidth`)**: `0` failures across all 30 `glass_<page>_<theme>_<width>.png` screenshots (`390px`, `768px`, `1440px` in light and dark).
-- **Displayed Underscores (`scripts/check_underscores.py`)**: `TOTAL_UNDERSCORE_OFFENDERS=0` across all 16 route/state/theme combinations.
-- **Main JS Bundle Size**: `485.90 kB` raw (`< 500 kB` guardrail).
+### 4.4 Computed sRGB WCAG 2.2 AA Contrast Against Worst-Case Rendered Backdrop Pixels (`scripts/verify_glass_and_perf.py`)
+
+Sampled directly from the decoded PNG screenshot pixels behind the panel (including the lavender ring and gold coin on `/`):
+
+| Page | Theme | Width | Primary Text RGB | Secondary Text RGB | Scrim RGBA | Worst Backdrop Pixel RGB | Composited Scrim RGB | Primary WCAG Ratio | Secondary WCAG Ratio | Pass (`>= 4.5:1`) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `landing` (`/`) | `light` | `390` | `[10, 10, 10]` | `[82, 82, 86]` | `[255, 255, 255, 0.88]` | `[137, 137, 137]` | `[240.8, 240.8, 240.8]` | **`17.50:1`** | **`6.88:1`** | Pass |
+| `landing` (`/`) | `light` | `1440` | `[10, 10, 10]` | `[82, 82, 86]` | `[255, 255, 255, 0.88]` | `[138, 138, 138]` | `[241.0, 241.0, 241.0]` | **`17.52:1`** | **`6.88:1`** | Pass |
+| `landing` (`/`) | `dark` | `390` | `[245, 245, 245]` | `[180, 180, 186]` | `[12, 14, 20, 0.90]` | `[237, 237, 237]` | `[34.5, 36.3, 41.7]` | **`14.18:1`** | **`7.49:1`** | Pass |
+| `landing` (`/`) | `dark` | `1440` | `[245, 245, 245]` | `[180, 180, 186]` | `[12, 14, 20, 0.90]` | `[245, 238, 202]` | `[35.3, 36.4, 38.2]` | **`14.18:1`** | **`7.50:1`** | Pass |
+| `guard` (`/guard`) | `light` | `390` | `[10, 10, 10]` | `[82, 82, 86]` | `[255, 255, 255, 0.88]` | `[137, 137, 137]` | `[240.8, 240.8, 240.8]` | **`17.50:1`** | **`6.88:1`** | Pass |
+| `guard` (`/guard`) | `light` | `1440` | `[10, 10, 10]` | `[82, 82, 86]` | `[255, 255, 255, 0.88]` | `[139, 139, 139]` | `[241.1, 241.1, 241.1]` | **`17.54:1`** | **`6.89:1`** | Pass |
+| `guard` (`/guard`) | `dark` | `390` | `[245, 245, 245]` | `[180, 180, 186]` | `[12, 14, 20, 0.90]` | `[235, 235, 235]` | `[34.3, 36.1, 41.5]` | **`14.21:1`** | **`7.51:1`** | Pass |
+| `guard` (`/guard`) | `dark` | `1440` | `[245, 245, 245]` | `[180, 180, 186]` | `[12, 14, 20, 0.90]` | `[237, 237, 237]` | `[34.5, 36.3, 41.7]` | **`14.18:1`** | **`7.49:1`** | Pass |
+
+### 4.5 Overflow, Underscore, Console, Network & Bundle Verification
+- **Horizontal Overflow (`scrollWidth <= innerWidth`)**: `0` failures (`OVERFLOW_FAILURES=0`) across all 30 `glass_<page>_<theme>_<width>.png` screenshots (`390px`, `768px`, `1440px` in light and dark).
+- **Displayed Underscores (`scripts/check_underscores.py`)**: `TOTAL_UNDERSCORE_OFFENDERS=0` across all 16 route/state/theme combinations, including open glass panels on every route, expanded receipt rows on `/receipts`, live `"Try it"` output on `/integrate`, and all `title` tooltips and `aria-label` attributes.
+- **Console Errors & Network Hosts**: `TOTAL_CONSOLE_ERRORS=0`, `ALL_NETWORK_HOSTS_CONTACTED=['localhost']`.
+- **Main JS Bundle Size**: `477.58 kB` raw (`150.73 kB` gzip), under the `480 kB` raw cap.
+

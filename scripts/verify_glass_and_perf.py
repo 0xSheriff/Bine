@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """
-Phase C & D verification script:
+Phase C, D & E verification script:
 1. Measure FCP / LCP / CLS / load timings on / and /guard.
-2. Record a Performance trace while clicking a GlassStack trigger on / and /guard,
-   verifying zero long tasks > 50 ms and zero layout thrash during animation.
-3. Verify WCAG 2.2 AA contrast (>= 4.5:1) inside open glass panels in both light and dark modes,
-   and verify all interactive tap targets >= 44px and zero horizontal overflow at 390, 768, 1440.
+2. Verify all glass panels start closed (initial_panel_open == False), click the first
+   .bine-glass-trigger (metric tile on /guard, proof card on /), record a Performance trace
+   during the real click, and assert glass_panel_opened == True and zero long tasks > 50 ms.
+3. Decode rendered PNG screenshots to sample actual pixels behind the panel (including the
+   lavender ring on landing) and inside .bine-glass-scrim at 390 and 1440 in light and dark,
+   compute WCAG 2.2 sRGB relative luminance and contrast ratios for primary and secondary text,
+   and fail if any ratio < 4.5:1.
 4. Capture docs/screenshots/glass_<page>_<theme>_<width>.png across all 5 routes at 390, 768, 1440
-   in light and dark with a glass card open on each page.
+   in light and dark from real clicks.
 """
 
 import base64
 import json
 import os
+import re
 import socket
 import struct
 import subprocess
@@ -21,16 +25,127 @@ import tempfile
 import time
 import urllib.parse
 import urllib.request
+import zlib
 
 CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 BASE_URL = os.environ.get("BINE_FRONTEND_URL", "http://localhost:5174")
-OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "screenshots")
+OUT_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "screenshots"
+)
 
 
 def get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+def decode_png_rgb(png_bytes: bytes) -> tuple[int, int, list[list[tuple[int, int, int]]]]:
+    """Decode an 8-bit RGB or RGBA PNG into (width, height, rows_of_rgb_tuples)."""
+    if png_bytes[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("Invalid PNG header")
+    pos = 8
+    width = height = bit_depth = color_type = 0
+    idat_chunks: list[bytes] = []
+    while pos < len(png_bytes):
+        length = struct.unpack("!I", png_bytes[pos : pos + 4])[0]
+        chunk_type = png_bytes[pos + 4 : pos + 8]
+        chunk_data = png_bytes[pos + 8 : pos + 8 + length]
+        pos += 12 + length
+        if chunk_type == b"IHDR":
+            width, height, bit_depth, color_type, _, _, _ = struct.unpack("!IIBBBBB", chunk_data)
+        elif chunk_type == b"IDAT":
+            idat_chunks.append(chunk_data)
+        elif chunk_type == b"IEND":
+            break
+    if bit_depth != 8 or color_type not in (2, 6):
+        raise ValueError(f"Unsupported PNG format: bit_depth={bit_depth}, color_type={color_type}")
+    bpp = 3 if color_type == 2 else 4
+    raw = zlib.decompress(b"".join(idat_chunks))
+    stride = width * bpp
+    rows: list[list[tuple[int, int, int]]] = []
+    prev_scanline = bytearray(stride)
+    offset = 0
+
+    def paeth(a: int, b: int, c: int) -> int:
+        p = a + b - c
+        pa = abs(p - a)
+        pb = abs(p - b)
+        pc = abs(p - c)
+        if pa <= pb and pa <= pc:
+            return a
+        if pb <= pc:
+            return b
+        return c
+
+    for _ in range(height):
+        ftype = raw[offset]
+        scanline = bytearray(raw[offset + 1 : offset + 1 + stride])
+        offset += 1 + stride
+        if ftype == 1:  # Sub
+            for i in range(bpp, stride):
+                scanline[i] = (scanline[i] + scanline[i - bpp]) & 0xFF
+        elif ftype == 2:  # Up
+            for i in range(stride):
+                scanline[i] = (scanline[i] + prev_scanline[i]) & 0xFF
+        elif ftype == 3:  # Average
+            for i in range(stride):
+                left = scanline[i - bpp] if i >= bpp else 0
+                up = prev_scanline[i]
+                scanline[i] = (scanline[i] + ((left + up) >> 1)) & 0xFF
+        elif ftype == 4:  # Paeth
+            for i in range(stride):
+                left = scanline[i - bpp] if i >= bpp else 0
+                up = prev_scanline[i]
+                up_left = prev_scanline[i - bpp] if i >= bpp else 0
+                scanline[i] = (scanline[i] + paeth(left, up, up_left)) & 0xFF
+        prev_scanline = scanline
+        row_pixels: list[tuple[int, int, int]] = []
+        for x in range(0, stride, bpp):
+            row_pixels.append((scanline[x], scanline[x + 1], scanline[x + 2]))
+        rows.append(row_pixels)
+    return width, height, rows
+
+
+def srgb_channel_to_linear(c: float) -> float:
+    v = c / 255.0
+    return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+
+def relative_luminance(rgb: tuple[float, float, float]) -> float:
+    r, g, b = rgb
+    return (
+        0.2126 * srgb_channel_to_linear(r)
+        + 0.7152 * srgb_channel_to_linear(g)
+        + 0.0722 * srgb_channel_to_linear(b)
+    )
+
+
+def wcag_contrast_ratio(rgb1: tuple[float, float, float], rgb2: tuple[float, float, float]) -> float:
+    l1 = relative_luminance(rgb1)
+    l2 = relative_luminance(rgb2)
+    lighter = max(l1, l2)
+    darker = min(l1, l2)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def parse_css_rgba(css_str: str) -> tuple[float, float, float, float]:
+    nums = [float(x) for x in re.findall(r"[\d.]+", css_str or "")]
+    if len(nums) == 3:
+        return nums[0], nums[1], nums[2], 1.0
+    if len(nums) >= 4:
+        return nums[0], nums[1], nums[2], nums[3]
+    return 0.0, 0.0, 0.0, 1.0
+
+
+def composite_over(fg_rgba: tuple[float, float, float, float], bg_rgb: tuple[int, int, int]) -> tuple[float, float, float]:
+    fr, fg, fb, alpha = fg_rgba
+    br, bg, bb = bg_rgb
+    return (
+        alpha * fr + (1.0 - alpha) * br,
+        alpha * fg + (1.0 - alpha) * bg,
+        alpha * fb + (1.0 - alpha) * bb,
+    )
 
 
 class SimpleWS:
@@ -149,6 +264,30 @@ class CDPSession:
         self.ws.close()
 
 
+def sample_region_pixels(
+    rows: list[list[tuple[int, int, int]]],
+    width: int,
+    height: int,
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+    step: int = 4,
+) -> list[tuple[int, int, int]]:
+    x0 = max(0, min(width - 1, x0))
+    x1 = max(x0 + 1, min(width, x1))
+    y0 = max(0, min(height - 1, y0))
+    y1 = max(y0 + 1, min(height, y1))
+    samples: list[tuple[int, int, int]] = []
+    for y in range(y0, y1, step):
+        row = rows[y]
+        for x in range(x0, x1, step):
+            samples.append(row[x])
+    if not samples:
+        samples.append(rows[y0][x0])
+    return samples
+
+
 def main() -> int:
     os.makedirs(OUT_DIR, exist_ok=True)
     port = get_free_port()
@@ -193,14 +332,21 @@ def main() -> int:
         cdp.send("Runtime.enable")
         cdp.send("Performance.enable")
 
-        # 1. Measure load & LCP/FCP/CLS + click performance trace on / and /guard
+        # 1. Measure load & FCP + real click performance trace on / and /guard
         for label, path in [("landing", "/"), ("guard", "/guard?ticker=NVDA&amount=5.5")]:
             cdp.send(
                 "Emulation.setDeviceMetricsOverride",
                 {"width": 1440, "height": 900, "deviceScaleFactor": 1, "mobile": False},
             )
             cdp.send("Page.navigate", {"url": f"{BASE_URL}{path}"})
-            time.sleep(1.8 if "NVDA" in path else 1.0)
+            # Wait for .bine-glass-trigger to mount (especially on /guard while /api/quote resolves)
+            for _ in range(30):
+                has_trigger = cdp.eval_js("Boolean(document.querySelector('.bine-glass-trigger'))")
+                if has_trigger:
+                    break
+                time.sleep(0.2)
+            time.sleep(0.3)
+
             perf = cdp.eval_js(
                 """
                 (() => {
@@ -220,6 +366,7 @@ def main() -> int:
             click_trace = cdp.eval_js(
                 """
                 new Promise(resolve => {
+                  const initialOpen = Boolean(document.querySelector('[data-glass-panel]'));
                   const longTasks = [];
                   let obs;
                   if (typeof PerformanceObserver !== 'undefined') {
@@ -230,14 +377,17 @@ def main() -> int:
                     });
                     try { obs.observe({ entryTypes: ['longtask'] }); } catch {}
                   }
+                  const btn = document.querySelector('.bine-glass-trigger');
+                  const triggerLabel = btn ? (btn.textContent || '').trim().slice(0, 48) : null;
                   const t0 = performance.now();
-                  const btn = document.querySelector('.bine-glass-trigger[aria-expanded="false"]') || document.querySelector('.bine-glass-trigger');
                   if (btn) btn.click();
                   const handlerMs = +(performance.now() - t0).toFixed(2);
                   setTimeout(() => {
                     if (obs) obs.disconnect();
                     const panel = document.querySelector('[data-glass-panel]');
                     resolve({
+                      initial_panel_open: initialOpen,
+                      clicked_trigger: triggerLabel,
                       click_handler_ms: handlerMs,
                       long_tasks_over_50ms: longTasks,
                       glass_panel_opened: Boolean(panel),
@@ -246,12 +396,27 @@ def main() -> int:
                 })
                 """
             )
-            print(f"[PERF] {label} ({path}): timings={json.dumps(perf)} click_trace={json.dumps(click_trace)}")
+            print(
+                f"[PERF] {label} ({path}): timings={json.dumps(perf)} click_trace={json.dumps(click_trace)}"
+            )
+            if click_trace["initial_panel_open"]:
+                print(
+                    f"ERROR: {label} started with a glass panel already open: {click_trace}",
+                    file=sys.stderr,
+                )
+                return 1
+            if not click_trace["glass_panel_opened"]:
+                print(
+                    f"ERROR: Real click on {label} did not open a glass panel: {click_trace}",
+                    file=sys.stderr,
+                )
+                return 1
             if click_trace["long_tasks_over_50ms"]:
                 print(f"ERROR: Long task > 50ms detected: {click_trace}", file=sys.stderr)
                 return 1
 
-        # 2. Capture all 30 screenshots (5 pages x 2 themes x 3 widths) with an open glass panel on each page
+        # 2. Capture all 30 screenshots (5 pages x 2 themes x 3 widths) from real clicks
+        #    and compute WCAG sRGB contrast ratios at 390 and 1440 in light and dark.
         pages = [
             ("landing", "/"),
             ("guard", "/guard?ticker=NVDA&amount=5.5"),
@@ -262,7 +427,8 @@ def main() -> int:
         widths = [390, 768, 1440]
 
         overflow_failures = []
-        contrast_checks = []
+        contrast_results = []
+        contrast_failures = []
 
         for page_name, path in pages:
             for theme in ("light", "dark"):
@@ -278,7 +444,16 @@ def main() -> int:
                         },
                     )
                     cdp.send("Page.navigate", {"url": f"{BASE_URL}{path}"})
-                    time.sleep(1.5 if page_name == "guard" else 0.9)
+                    # Wait for .bine-glass-trigger to mount
+                    for _ in range(30):
+                        ready = cdp.eval_js(
+                            "Boolean(document.querySelector('.bine-glass-trigger'))"
+                        )
+                        if ready:
+                            break
+                        time.sleep(0.2)
+                    time.sleep(0.25)
+
                     cdp.eval_js(
                         f"""
                         (() => {{
@@ -287,28 +462,58 @@ def main() -> int:
                         }})()
                         """
                     )
-                    # Wait up to 4s for .bine-glass-trigger or [data-glass-panel] to mount
-                    for _ in range(20):
-                        ready = cdp.eval_js(
-                            "Boolean(document.querySelector('[data-glass-panel]') || document.querySelector('.bine-glass-trigger'))"
-                        )
-                        if ready:
-                            break
-                        time.sleep(0.2)
+                    time.sleep(0.15)
 
-                    # Ensure one glass panel is open on every page and scroll it into the viewport
+                    # Verify panel starts closed before clicking
+                    started_open = cdp.eval_js("Boolean(document.querySelector('[data-glass-panel]'))")
+                    if started_open:
+                        print(
+                            f"ERROR: {page_name}_{theme}_{w} started with panel open before click!",
+                            file=sys.stderr,
+                        )
+                        return 1
+
+                    # Capture pre-click screenshot on landing/guard at 390 and 1440 to sample lavender ring / backdrop
+                    pre_click_png = None
+                    hero_ring_rect = None
+                    if w in (390, 1440) and page_name in ("landing", "guard"):
+                        hero_ring_rect = cdp.eval_js(
+                            """
+                            (() => {
+                              const svg = document.querySelector('svg');
+                              const allSvgs = Array.from(document.querySelectorAll('svg'));
+                              const bigSvg = allSvgs.find(s => s.getBoundingClientRect().width > 180) || svg;
+                              if (!bigSvg) return null;
+                              const r = bigSvg.getBoundingClientRect();
+                              return {
+                                x0: Math.round(r.left),
+                                y0: Math.round(r.top),
+                                x1: Math.round(r.right),
+                                y1: Math.round(r.bottom),
+                              };
+                            })()
+                            """
+                        )
+                        pre_click_png = base64.b64decode(
+                            cdp.send("Page.captureScreenshot", {"format": "png"})["data"]
+                        )
+
+                    # Click the first .bine-glass-trigger to open the glass panel
                     cdp.eval_js(
                         """
                         (() => {
-                          let existing = document.querySelector('[data-glass-panel]');
-                          if (!existing) {
-                            const trigger = document.querySelector('.bine-glass-trigger');
-                            if (trigger) trigger.click();
-                          }
+                          const trigger = document.querySelector('.bine-glass-trigger');
+                          if (trigger) trigger.click();
                         })()
                         """
                     )
-                    time.sleep(0.35)
+                    # Wait for [data-glass-panel] to appear from the real click
+                    for _ in range(20):
+                        if cdp.eval_js("Boolean(document.querySelector('[data-glass-panel]'))"):
+                            break
+                        time.sleep(0.1)
+                    time.sleep(0.25)
+
                     cdp.eval_js(
                         """
                         (() => {
@@ -327,38 +532,150 @@ def main() -> int:
                           const overflow = document.documentElement.scrollWidth > window.innerWidth;
                           const panel = document.querySelector('[data-glass-panel]');
                           const scrim = document.querySelector('.bine-glass-scrim');
-                          let fg = null, bg = null;
+                          let primaryColor = null;
+                          let secondaryColor = null;
+                          let scrimBg = null;
+                          let scrimRect = null;
                           if (scrim) {
                             const cs = window.getComputedStyle(scrim);
-                            fg = cs.color;
-                            bg = cs.backgroundColor;
+                            primaryColor = cs.color;
+                            scrimBg = cs.backgroundColor;
+                            const r = scrim.getBoundingClientRect();
+                            scrimRect = {
+                              x0: Math.round(r.left),
+                              y0: Math.round(r.top),
+                              x1: Math.round(r.right),
+                              y1: Math.round(r.bottom),
+                            };
+                            // Find a secondary text element inside scrim or read --text-secondary
+                            const rootCs = window.getComputedStyle(document.documentElement);
+                            const secHex = (rootCs.getPropertyValue('--text-secondary') || '').trim();
+                            const probe = document.createElement('span');
+                            probe.style.color = secHex || 'var(--text-secondary)';
+                            document.body.appendChild(probe);
+                            secondaryColor = window.getComputedStyle(probe).color;
+                            document.body.removeChild(probe);
                           }
                           return {
                             scrollWidth: document.documentElement.scrollWidth,
                             innerWidth: window.innerWidth,
                             overflow,
                             hasGlassPanel: Boolean(panel),
-                            fg,
-                            bg,
+                            primaryColor,
+                            secondaryColor,
+                            scrimBg,
+                            scrimRect,
                           };
                         })()
                         """
                     )
+                    if not check["hasGlassPanel"]:
+                        print(
+                            f"ERROR: {page_name}_{theme}_{w} failed to open glass panel on click!",
+                            file=sys.stderr,
+                        )
+                        return 1
                     if check["overflow"]:
-                        overflow_failures.append(f"{page_name}_{theme}_{w}: {check['scrollWidth']} > {check['innerWidth']}")
-                    if w == 1440:
-                        contrast_checks.append(f"{page_name}_{theme}: fg={check['fg']} on scrim={check['bg']}")
+                        overflow_failures.append(
+                            f"{page_name}_{theme}_{w}: {check['scrollWidth']} > {check['innerWidth']}"
+                        )
 
-                    shot = cdp.send("Page.captureScreenshot", {"format": "png"})["data"]
+                    shot_bytes = base64.b64decode(
+                        cdp.send("Page.captureScreenshot", {"format": "png"})["data"]
+                    )
                     out_path = os.path.join(OUT_DIR, f"glass_{page_name}_{theme}_{w}.png")
                     with open(out_path, "wb") as f:
-                        f.write(base64.b64decode(shot))
-                    print(f"Saved {os.path.relpath(out_path)} (glass_open={check['hasGlassPanel']}, overflow={check['overflow']})")
+                        f.write(shot_bytes)
+                    print(
+                        f"Saved {os.path.relpath(out_path)} (glass_open={check['hasGlassPanel']}, overflow={check['overflow']})"
+                    )
 
-        print("CONTRAST_SCRIM_SAMPLES:", json.dumps(contrast_checks, indent=2))
+                    # Item 2: Compute WCAG contrast ratios at 390 and 1440 in light and dark
+                    if w in (390, 1440) and page_name in ("landing", "guard") and check["scrimRect"]:
+                        pw, ph, post_rows = decode_png_rgb(shot_bytes)
+                        sr = check["scrimRect"]
+                        # Sample pixels inside the rendered open glass scrim and also behind the panel
+                        scrim_pixels = sample_region_pixels(
+                            post_rows, pw, ph, sr["x0"] + 8, sr["y0"] + 8, sr["x1"] - 8, sr["y1"] - 8, step=6
+                        )
+                        backdrop_pixels = list(scrim_pixels)
+                        if pre_click_png is not None:
+                            bw, bh, pre_rows = decode_png_rgb(pre_click_png)
+                            # Sample where the panel sits in the pre-click screenshot
+                            backdrop_pixels.extend(
+                                sample_region_pixels(
+                                    pre_rows, bw, bh, sr["x0"], sr["y0"], sr["x1"], sr["y1"], step=8
+                                )
+                            )
+                            # On landing, also sample the lavender ring region from the screenshot
+                            if hero_ring_rect:
+                                backdrop_pixels.extend(
+                                    sample_region_pixels(
+                                        pre_rows,
+                                        bw,
+                                        bh,
+                                        hero_ring_rect["x0"],
+                                        hero_ring_rect["y0"],
+                                        hero_ring_rect["x1"],
+                                        hero_ring_rect["y1"],
+                                        step=6,
+                                    )
+                                )
+
+                        prim_rgba = parse_css_rgba(check["primaryColor"])
+                        sec_rgba = parse_css_rgba(check["secondaryColor"])
+                        scrim_rgba = parse_css_rgba(check["scrimBg"])
+                        prim_rgb = (prim_rgba[0], prim_rgba[1], prim_rgba[2])
+                        sec_rgb = (sec_rgba[0], sec_rgba[1], sec_rgba[2])
+
+                        # Worst-case backdrop pixel:
+                        # - In light mode (dark text), worst-case backdrop is the darkest pixel (lowest luminance)
+                        #   excluding dark text/pill pixels in the hero (filter to backdrop luminance range > 0.25 in light mode,
+                        #   which includes the lavender ring #B9B8CF at L~0.49 and gold coin #E3CF8A at L~0.64).
+                        # - In dark mode (light text), worst-case backdrop is the brightest pixel (highest luminance),
+                        #   including the lavender ring / gold coin if a glass panel sits over it!
+                        if theme == "light":
+                            bg_candidates = [
+                                px for px in backdrop_pixels if relative_luminance(px) >= 0.25
+                            ] or backdrop_pixels
+                            worst_raw_backdrop = min(bg_candidates, key=relative_luminance)
+                        else:
+                            bg_candidates = [
+                                px for px in backdrop_pixels if relative_luminance(px) <= 0.85
+                            ] or backdrop_pixels
+                            worst_raw_backdrop = max(bg_candidates, key=relative_luminance)
+
+                        composited_bg = composite_over(scrim_rgba, worst_raw_backdrop)
+                        prim_ratio = round(wcag_contrast_ratio(prim_rgb, composited_bg), 2)
+                        sec_ratio = round(wcag_contrast_ratio(sec_rgb, composited_bg), 2)
+
+                        record = {
+                            "page": page_name,
+                            "theme": theme,
+                            "width": w,
+                            "primary_rgb": [int(x) for x in prim_rgb],
+                            "secondary_rgb": [int(x) for x in sec_rgb],
+                            "scrim_rgba": list(scrim_rgba),
+                            "worst_backdrop_pixel_rgb": list(worst_raw_backdrop),
+                            "composited_scrim_rgb": [round(x, 1) for x in composited_bg],
+                            "primary_wcag_ratio": prim_ratio,
+                            "secondary_wcag_ratio": sec_ratio,
+                            "pass_4_5": prim_ratio >= 4.5 and sec_ratio >= 4.5,
+                        }
+                        contrast_results.append(record)
+                        print(f"[WCAG] {page_name}_{theme}_{w}: {json.dumps(record)}")
+                        if not record["pass_4_5"]:
+                            contrast_failures.append(record)
+
+        print("WCAG_CONTRAST_SUMMARY:", json.dumps(contrast_results, indent=2))
         print(f"OVERFLOW_FAILURES={len(overflow_failures)}")
-        if overflow_failures:
-            print("ERROR: Overflow failures:", overflow_failures, file=sys.stderr)
+        print(f"CONTRAST_FAILURES={len(contrast_failures)}")
+        if overflow_failures or contrast_failures:
+            print(
+                "ERROR: Failures detected:",
+                {"overflow": overflow_failures, "contrast": contrast_failures},
+                file=sys.stderr,
+            )
             return 1
 
         cdp.close()

@@ -183,7 +183,7 @@ export default function Integrate() {
   const [tryLoading, setTryLoading] = useState<boolean>(false)
   const [tryResult, setTryResult] = useState<QuoteVerdictResponse | null>(null)
   const [tryError, setTryError] = useState<string | null>(null)
-  const [openFieldKey, setOpenFieldKey] = useState<string | null>('verdict')
+  const [openFieldKey, setOpenFieldKey] = useState<string | null>(null)
 
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const fieldTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -443,7 +443,7 @@ export default function Integrate() {
                                     setOpenFieldKey(prev => (prev === row.key ? null : row.key))
                                   }, reducedMotion)
                                 }
-                                className="bine-pill-secondary px-3 min-h-[44px] text-xs font-medium cursor-pointer"
+                                className="bine-glass-trigger bine-pill-secondary px-3 min-h-[44px] text-xs font-medium cursor-pointer"
                               >
                                 {isOpen ? 'Hide' : 'Sample'}
                               </button>

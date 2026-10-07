@@ -1,29 +1,5 @@
 [
   {
-    "id": "aapl-min-2",
-    "ticker": "AAPL",
-    "token_symbol": "AAPLon",
-    "issuer": "Ondo",
-    "amount_usd": 2.0,
-    "verdict": "REFUSE",
-    "refusal_code": "below_issuer_minimum",
-    "rule_label": "Below issuer minimum",
-    "recorded_at": "2026-10-02T23:57:05Z",
-    "market_status": "REGULAR",
-    "token_price_usd": 236.0,
-    "reference_price_usd": 235.12,
-    "share_ratio": 1.0,
-    "spread_pct": null,
-    "upstream_code": "40375",
-    "message": "AAPLon (Ondo) requires a $5.00 minimum order. Your $2.00 request is below that minimum ([40375] Minimum order amount is 5 USD.). Not buying.",
-    "alternative": {
-      "symbol": null,
-      "issuer": null,
-      "eligible": false,
-      "note": "No bStocks AAPL token exists in the catalog."
-    }
-  },
-  {
     "id": "spyon-slippage-250",
     "ticker": "SPY",
     "token_symbol": "SPYon",
@@ -36,15 +12,15 @@
     "market_status": "REGULAR",
     "token_price_usd": 1087.43,
     "reference_price_usd": 772.52,
-    "share_ratio": 1.0,
+    "share_ratio": 1.0095,
     "spread_pct": 40.76,
     "upstream_code": null,
     "message": "SPYon (Ondo) quotes $1,087.43 per share vs $772.52 reference (40.76% above reference, limit 1.00%). Not buying.",
     "alternative": {
       "symbol": "SPYB",
       "issuer": "bStocks",
-      "eligible": false,
-      "note": "SPYB at $25.00 quoted $693.15 vs $670.40 reference (3.39% spread at 2026-10-05T15:04:13Z, also over the 1.00% cap)."
+      "eligible": true,
+      "note": "SPYB at $25.00 quoted $773.35 vs $773.02 reference (+0.04% spread at 2026-10-05T15:04:13Z)."
     }
   },
   {
@@ -55,7 +31,7 @@
     "amount_usd": 5.5,
     "verdict": "REFUSE",
     "refusal_code": "quality_unreliable",
-    "rule_label": "Share ratio outside 0.5–1.5x",
+    "rule_label": "Share ratio outside 0.25-5.00x",
     "recorded_at": "2026-10-05T15:04:16Z",
     "market_status": "REGULAR",
     "token_price_usd": 20538.32,
@@ -63,7 +39,7 @@
     "share_ratio": 10.0261,
     "spread_pct": null,
     "upstream_code": "40374",
-    "message": "KLACon has a share ratio of 10.0261. Its token price $20,538.32 is 10.03x the $2,048.49 per-share reference, as the ratio predicts. Ratios outside 0.5-1.5x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying.",
+    "message": "KLACon has a share ratio of 10.0261. Its token price $20,538.32 is 10.03x the $2,048.49 per-share reference, as the ratio predicts. Ratios outside 0.25-5.00x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying.",
     "alternative": null
   },
   {
@@ -74,15 +50,34 @@
     "amount_usd": 5.5,
     "verdict": "REFUSE",
     "refusal_code": "quality_unreliable",
-    "rule_label": "Share ratio outside 0.5–1.5x",
+    "rule_label": "Share ratio outside 0.25-5.00x",
     "recorded_at": "2026-10-05T15:04:19Z",
     "market_status": "REGULAR",
     "token_price_usd": 6709.25,
     "reference_price_usd": 670.92,
     "share_ratio": 10.0,
-    "spread_pct": 0.0,
+    "spread_pct": null,
     "upstream_code": null,
-    "message": "NFLXon has a share ratio of 10.0000. Its token price $6,709.25 is 10.00x the $670.92 per-share reference, as the ratio predicts. Ratios outside 0.5-1.5x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying.",
+    "message": "NFLXon has a share ratio of 10.0000. Its token price $6,709.25 is 10.00x the $670.92 per-share reference, as the ratio predicts. Ratios outside 0.25-5.00x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying.",
+    "alternative": null
+  },
+  {
+    "id": "pplt-ratio-5-50",
+    "ticker": "PPLT",
+    "token_symbol": "PPLTon",
+    "issuer": "Ondo",
+    "amount_usd": 5.5,
+    "verdict": "REFUSE",
+    "refusal_code": "quality_unreliable",
+    "rule_label": "Share ratio outside 0.25-5.00x",
+    "recorded_at": "2026-10-05T15:04:21Z",
+    "market_status": "REGULAR",
+    "token_price_usd": 1554.54,
+    "reference_price_usd": 155.45,
+    "share_ratio": 10.0,
+    "spread_pct": null,
+    "upstream_code": "40374",
+    "message": "PPLTon has a share ratio of 10.0000. Its token price $1,554.54 is 10.00x the $155.45 per-share reference, as the ratio predicts. Ratios outside 0.25-5.00x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying.",
     "alternative": null
   },
   {
@@ -96,12 +91,31 @@
     "rule_label": "Order-book depth too thin",
     "recorded_at": "2026-10-05T15:04:22Z",
     "market_status": "REGULAR",
-    "token_price_usd": 456.71,
-    "reference_price_usd": 456.71,
-    "share_ratio": 1.0,
+    "token_price_usd": 1619.08,
+    "reference_price_usd": 323.82,
+    "share_ratio": 5.0,
     "spread_pct": null,
     "upstream_code": "40374",
-    "message": "CVNAon (Ondo) has no executable route at $5.50 during regular market hours ([40374] Current liquidity is insufficient to proceed with the order. Please reduce the order amount and try again.). Not buying.",
+    "message": "No pool on BNB Chain can fill $5.50 of CVNAon right now. Not buying.",
+    "alternative": null
+  },
+  {
+    "id": "now-depth-5-50",
+    "ticker": "NOW",
+    "token_symbol": "NOWon",
+    "issuer": "Ondo",
+    "amount_usd": 5.5,
+    "verdict": "REFUSE",
+    "refusal_code": "depth_thin",
+    "rule_label": "Order-book depth too thin",
+    "recorded_at": "2026-10-05T15:04:24Z",
+    "market_status": "REGULAR",
+    "token_price_usd": 3391.9,
+    "reference_price_usd": 678.38,
+    "share_ratio": 5.0,
+    "spread_pct": null,
+    "upstream_code": "40374",
+    "message": "No pool on BNB Chain can fill $5.50 of NOWon right now. Not buying.",
     "alternative": null
   },
   {
@@ -112,7 +126,7 @@
     "amount_usd": 5.5,
     "verdict": "REFUSE",
     "refusal_code": "quality_unreliable",
-    "rule_label": "Share ratio outside 0.5–1.5x",
+    "rule_label": "Share ratio outside 0.25-5.00x",
     "recorded_at": "2026-10-01T00:48:35Z",
     "market_status": "PAUSED",
     "token_price_usd": 1.07,
@@ -120,7 +134,7 @@
     "share_ratio": 0.0667,
     "spread_pct": null,
     "upstream_code": null,
-    "message": "ENLVon has a share ratio of 0.0667. Its token price $1.07 is 0.07x the $16.05 per-share reference, as the ratio predicts. Ratios outside 0.5-1.5x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying.",
+    "message": "ENLVon has a share ratio of 0.0667. Its token price $1.07 is 0.07x the $16.05 per-share reference, as the ratio predicts. Ratios outside 0.25-5.00x are not supported by this tool, because quoted amounts for them have not been checked against a live trade. Not buying.",
     "alternative": null
   }
 ]

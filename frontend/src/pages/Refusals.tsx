@@ -20,7 +20,7 @@ export default function Refusals() {
   const [liveResults, setLiveResults] = useState<Record<string, QuoteVerdictResponse>>({})
   const [liveErrors, setLiveErrors] = useState<Record<string, string>>({})
   const [openRuleCode, setOpenRuleCode] = useState<string | null>(null)
-  const [openCardId, setOpenCardId] = useState<string | null>(recordedRefusals[0]?.id ?? null)
+  const [openCardId, setOpenCardId] = useState<string | null>(null)
 
   const ruleTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const cardTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -171,7 +171,7 @@ export default function Refusals() {
                                     setOpenRuleCode(prev => (prev === code ? null : code))
                                   }, reducedMotion)
                                 }
-                                className="bine-pill-secondary px-3 min-h-[44px] text-xs font-medium cursor-pointer"
+                                className="bine-glass-trigger bine-pill-secondary px-3 min-h-[44px] text-xs font-medium cursor-pointer"
                               >
                                 {isRuleOpen ? 'Hide' : 'Details'}
                               </button>
@@ -284,7 +284,7 @@ export default function Refusals() {
                                 setOpenCardId(prev => (prev === item.id ? null : item.id))
                               }, reducedMotion)
                             }
-                            className="bine-pill-secondary cursor-pointer min-h-[44px]"
+                            className="bine-glass-trigger bine-pill-secondary cursor-pointer min-h-[44px]"
                             style={{
                               height: '44px',
                               padding: '0 18px',

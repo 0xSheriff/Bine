@@ -11,8 +11,8 @@
   --border: rgba(10, 10, 10, 0.07);
   --hairline: rgba(10, 10, 10, 0.08);
   --text: #0A0A0A;
-  --text-secondary: #5F5F63;
-  --muted: #5F5F63;
+  --text-secondary: #525256;
+  --muted: #525256;
 
   --pill-primary-bg: #0A0A0A;
   --pill-primary-text: #FFFFFF;
@@ -55,8 +55,8 @@
   --border: rgba(245, 245, 245, 0.08);
   --hairline: rgba(245, 245, 245, 0.09);
   --text: #F5F5F5;
-  --text-secondary: #A1A1A6;
-  --muted: #A1A1A6;
+  --text-secondary: #B4B4BA;
+  --muted: #B4B4BA;
 
   --pill-primary-bg: #F5F5F5;
   --pill-primary-text: #0A0A0A;
@@ -362,11 +362,11 @@ details > summary::-webkit-details-marker {
   z-index: 1;
   border-radius: calc(var(--card-radius) - 4px);
   padding: 16px;
-  background-color: rgba(255, 255, 255, 0.78);
+  background-color: rgba(255, 255, 255, 0.88);
 }
 
 [data-theme="dark"] .bine-glass-scrim {
-  background-color: rgba(14, 16, 22, 0.80);
+  background-color: rgba(12, 14, 20, 0.90);
 }
 
 /* At 390px / mobile (< 640px), expanded glass panels behave as a scrollable bottom sheet or bounded sheet */

@@ -42,7 +42,7 @@ interface EnrichedReceipt {
 
 export default function Receipts() {
   const reducedMotion = usePrefersReducedMotion()
-  const [openDecisionId, setOpenDecisionId] = useState<number | null>(18)
+  const [openDecisionId, setOpenDecisionId] = useState<number | null>(null)
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
   const triggerRefs = useRef<Record<number, HTMLButtonElement | null>>({})
 
@@ -304,7 +304,7 @@ export default function Receipts() {
                             onClick={() => toggleExpand(row.decision_id)}
                             aria-expanded={isOpen}
                             aria-controls={`receipt-details-${row.decision_id}`}
-                            className="bine-pill-secondary cursor-pointer min-h-[44px]"
+                            className="bine-glass-trigger bine-pill-secondary cursor-pointer min-h-[44px]"
                             style={{ height: '44px', padding: '0 16px', fontSize: '12px' }}
                           >
                             {isOpen ? 'Hide details' : 'Show details'}

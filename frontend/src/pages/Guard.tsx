@@ -102,8 +102,8 @@ function deriveGuardChecks(
         const ratio = selectedRow?.token_to_share_ratio
         detail =
           ratio !== null && ratio !== undefined
-            ? `Share ratio ${ratio.toFixed(4)}x within 0.50-1.50x`
-            : 'Within 0.50-1.50x ratio bounds'
+            ? `Share ratio ${ratio.toFixed(4)}x within 0.25-5.00x`
+            : 'Within 0.25-5.00x ratio bounds'
       } else if (code === 'depth_thin') {
         const depthSourceLabel = selectedRow?.depth_source
           ? humanizeStatus(selectedRow.depth_source)
@@ -173,7 +173,7 @@ export default function Guard() {
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
   const [copiedCurl, setCopiedCurl] = useState<boolean>(false)
   const [dryRunReceipt, setDryRunReceipt] = useState<ExecuteTradeResponse | null>(null)
-  const [openMetricId, setOpenMetricId] = useState<string | null>('shares')
+  const [openMetricId, setOpenMetricId] = useState<string | null>(null)
   const [openCheckCode, setOpenCheckCode] = useState<string | null>(null)
   const metricTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const checkTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})

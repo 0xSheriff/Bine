@@ -111,8 +111,8 @@ export const GUARD_RULE_DEFINITIONS: Record<
   below_issuer_minimum: {
     name: 'Issuer minimum order',
     explanation:
-      'Blocks orders rejected by the issuer minimum ($5.00 on Ondo [40375]; no minimum on bStocks, tested live at $2.00).',
-    threshold: '$5.00 Ondo / > $0.00 bStocks ($0.01 tie-break floor)',
+      'Blocks orders rejected by the issuer minimum ($5.00 on Ondo [40375]; $0.01 tie-break floor on bStocks, tested live at $2.00).',
+    threshold: '$5.00 Ondo / $0.01 bStocks',
   },
   market_closed: {
     name: 'Trading session open',
@@ -126,8 +126,8 @@ export const GUARD_RULE_DEFINITIONS: Record<
   },
   quality_unreliable: {
     name: 'Token price & ratio sanity',
-    explanation: 'Filters sub-$1.00 outlier feeds and unsupported share ratios outside 0.50-1.50x.',
-    threshold: '>= $1.00 & 0.50x-1.50x ratio',
+    explanation: 'Filters sub-$1.00 outlier feeds and unsupported share ratios outside 0.25-5.00x.',
+    threshold: '>= $1.00 & 0.25x-5.00x ratio',
   },
   depth_thin: {
     name: 'On-chain pool depth',

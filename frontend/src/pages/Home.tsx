@@ -1,10 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { Suspense, lazy, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { fetchDecisions, fetchTickers } from '../api'
 import { usePrefersReducedMotion } from '../components/BineLogo'
 import { GlassStack, type GlassStackItem } from '../components/GlassStack'
-import { HeroArt } from '../components/HeroArt'
 import {
   Footer,
   TopHeader,
@@ -15,6 +14,10 @@ import {
 import onchainReceipts from '../data/onchain-receipts.json'
 import recordedRefusals from '../data/recorded-refusals.json'
 import { GUARD_RULE_DEFINITIONS, humanizeCode, humanizeStatus } from '../lib/humanize'
+
+const HeroArt = lazy(() =>
+  import('../components/HeroArt').then(m => ({ default: m.HeroArt })),
+)
 
 const FEATURED_REFUSAL =
   recordedRefusals.find(item => item.id === 'spyon-slippage-250') ?? recordedRefusals[0]
@@ -291,7 +294,7 @@ export default function Home() {
       detail: (
         <div className="space-y-2">
           <p className="m-0">
-            Every quote is checked against the 1.00% maximum spread above stock reference, the 0.50x to 1.50x supported share-ratio window, the $10K AMM pool depth / $1M 24h volume floor, and active market session status. If any rule fails, Bine returns a structured refusal with the exact reason.
+            Every quote is checked against the 1.00% maximum spread above stock reference, the 0.25x to 5.00x supported share-ratio window, the $10K AMM pool depth / $1M 24h volume floor, and active market session status. If any rule fails, Bine returns a structured refusal with the exact reason.
           </p>
         </div>
       ),
@@ -354,7 +357,9 @@ export default function Home() {
         <section className="relative overflow-hidden md:min-h-[min(88vh,760px)] flex items-center py-10 sm:py-14 md:py-16">
           {/* Desktop / Tablet Right-Side Ring Art (never touches nav, headline, or bottom edge) */}
           <div className="hidden md:flex absolute top-8 bottom-8 right-0 w-[49%] lg:w-[47%] translate-x-6 items-center justify-end pointer-events-none z-0 pr-2">
-            <HeroArt />
+            <Suspense fallback={null}>
+              <HeroArt />
+            </Suspense>
           </div>
 
           <div className="bine-container relative z-10 w-full">
@@ -422,7 +427,9 @@ export default function Home() {
 
               {/* Mobile Stacked Art */}
               <div className="md:hidden relative mt-8 -mr-6 opacity-75 pointer-events-none">
-                <HeroArt />
+                <Suspense fallback={null}>
+                  <HeroArt />
+                </Suspense>
               </div>
             </div>
           </div>

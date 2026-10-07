@@ -13,6 +13,7 @@ import {
 } from '../components/shared'
 import onchainReceipts from '../data/onchain-receipts.json'
 import recordedRefusals from '../data/recorded-refusals.json'
+import { humanizeCode, humanizeStatus } from '../lib/humanize'
 
 const FEATURED_REFUSAL =
   recordedRefusals.find(item => item.id === 'spyon-slippage-250') ?? recordedRefusals[0]
@@ -300,12 +301,13 @@ export default function Home() {
                       className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-semibold"
                       style={{ backgroundColor: 'var(--chip-bad-bg)', color: 'var(--bad)' }}
                     >
-                      {FEATURED_REFUSAL.refusal_code}
+                      {humanizeCode(FEATURED_REFUSAL.refusal_code)}
                     </span>
                   </div>
 
                   <div className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                    {FEATURED_REFUSAL.symbol} · ${FEATURED_REFUSAL.amount_usd.toFixed(2)} order · {FEATURED_REFUSAL.recorded_label}
+                    {FEATURED_REFUSAL.token_symbol} · ${FEATURED_REFUSAL.amount_usd.toFixed(2)} order ·{' '}
+                    {formatAbsoluteAndRelative(FEATURED_REFUSAL.recorded_at)}
                   </div>
 
                   <p className="text-sm sm:text-base font-medium m-0 leading-relaxed" style={{ color: 'var(--text)' }}>
@@ -315,8 +317,13 @@ export default function Home() {
 
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   <a
-                    href={FEATURED_REFUSAL.guard_href}
-                    onClick={e => navigateApp(FEATURED_REFUSAL.guard_href, e)}
+                    href={`/guard?ticker=${encodeURIComponent(FEATURED_REFUSAL.ticker)}&amount=${FEATURED_REFUSAL.amount_usd}`}
+                    onClick={e =>
+                      navigateApp(
+                        `/guard?ticker=${encodeURIComponent(FEATURED_REFUSAL.ticker)}&amount=${FEATURED_REFUSAL.amount_usd}`,
+                        e,
+                      )
+                    }
                     className="bine-pill-secondary"
                     style={{ height: '44px', padding: '0 20px', fontSize: '13px' }}
                   >
@@ -342,7 +349,7 @@ export default function Home() {
                       className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-semibold"
                       style={{ backgroundColor: 'var(--chip-good-bg)', color: 'var(--good)' }}
                     >
-                      Decision #{LATEST_RECEIPT.decision_id} · LIVE_SUBMITTED
+                      Decision #{LATEST_RECEIPT.decision_id} · {humanizeStatus('LIVE_SUBMITTED')}
                     </span>
                   </div>
 

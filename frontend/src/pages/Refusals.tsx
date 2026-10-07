@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchQuote, fetchTickers } from '../api'
-import { Footer, TopHeader, formatSecondsAgo, navigateApp } from '../components/shared'
+import {
+  Footer,
+  TopHeader,
+  formatAbsoluteAndRelative,
+  formatSecondsAgo,
+  navigateApp,
+} from '../components/shared'
 import recordedRefusals from '../data/recorded-refusals.json'
+import { humanizeCode, humanizeStatus } from '../lib/humanize'
 import type { QuoteVerdictResponse } from '../types'
 import { GUARD_RULE_DEFINITIONS } from './Guard'
 
@@ -45,7 +52,7 @@ export default function Refusals() {
     }
   }
 
-  const sessionStatus = sessionSample?.market?.status || 'regular / offhours'
+  const sessionStatus = humanizeStatus(sessionSample?.market?.status || 'regular')
   const sessionOpen = sessionSample?.market?.open ?? true
 
   return (
@@ -91,7 +98,7 @@ export default function Refusals() {
               </div>
             </div>
 
-            {/* 1. 8-Rule Legend */}
+            {/* 1. 8-Rule Legend (Code column removed per Phase A) */}
             <section aria-labelledby="rule-legend-heading" className="space-y-4">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 id="rule-legend-heading" className="text-lg font-semibold m-0">
@@ -114,7 +121,6 @@ export default function Refusals() {
                         }}
                       >
                         <th className="py-3 px-4 font-medium">Rule</th>
-                        <th className="py-3 px-4 font-medium">Code</th>
                         <th className="py-3 px-4 font-medium">What it protects</th>
                         <th className="py-3 px-4 font-medium">Threshold</th>
                       </tr>
@@ -126,9 +132,6 @@ export default function Refusals() {
                           style={{ borderBottom: '1px solid var(--hairline)' }}
                         >
                           <td className="py-3 px-4 font-medium whitespace-nowrap">{rule.name}</td>
-                          <td className="py-3 px-4 font-mono text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                            {code}
-                          </td>
                           <td className="py-3 px-4" style={{ color: 'var(--text-secondary)' }}>
                             {rule.explanation}
                           </td>
@@ -159,7 +162,12 @@ export default function Refusals() {
                   const live = liveResults[item.id]
                   const liveErr = liveErrors[item.id]
                   const isRunningThis = runningId === item.id
-                  const liveCode = live?.refusal?.code || (live?.verdict === 'BUY' ? 'BUY' : null)
+                  const liveCode = live?.refusal?.code
+                    ? humanizeCode(live.refusal.code)
+                    : live?.verdict === 'BUY'
+                      ? 'Buy'
+                      : null
+                  const guardHref = `/guard?ticker=${encodeURIComponent(item.ticker)}&amount=${item.amount_usd}`
 
                   return (
                     <article
@@ -176,13 +184,13 @@ export default function Refusals() {
                                 color: 'var(--bad)',
                               }}
                             >
-                              {item.refusal_code}
+                              {humanizeCode(item.refusal_code)}
                             </span>
                             <span className="text-sm font-semibold">
-                              {item.ticker} ({item.symbol}) · ${item.amount_usd.toFixed(2)}
+                              {item.ticker} ({item.token_symbol}) · ${item.amount_usd.toFixed(2)}
                             </span>
                             <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                              {item.recorded_label}
+                              {formatAbsoluteAndRelative(item.recorded_at)} · {humanizeStatus(item.market_status)}
                             </span>
                           </div>
 
@@ -207,8 +215,8 @@ export default function Refusals() {
                           </button>
 
                           <a
-                            href={item.guard_href}
-                            onClick={e => navigateApp(item.guard_href, e)}
+                            href={guardHref}
+                            onClick={e => navigateApp(guardHref, e)}
                             className="bine-pill-secondary min-h-[44px]"
                             style={{
                               height: '44px',
@@ -254,7 +262,7 @@ export default function Refusals() {
                                   </span>
                                 </div>
                                 <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                                  market {live.market.status} · {formatSecondsAgo(live.quoted_at)}
+                                  {humanizeStatus(live.market.status)} · {formatSecondsAgo(live.quoted_at)}
                                 </span>
                               </div>
                               <p className="text-sm m-0 leading-relaxed">

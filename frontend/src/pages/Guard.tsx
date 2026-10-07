@@ -21,6 +21,7 @@ import type {
   QuoteVerdictResponse,
   TickerItem,
 } from '../types'
+import { humanizeCode, humanizeStatus } from '../lib/humanize'
 
 const MAX_QUOTE_USD = 2500.0
 
@@ -39,12 +40,12 @@ export const GUARD_RULE_DEFINITIONS: Record<
   amount_over_cap: {
     name: 'Order size cap',
     explanation: 'Protects against oversized single orders above the quote safety limit.',
-    threshold: '$0.01 to $2,500.00',
+    threshold: '> $0.00 to $2,500.00',
   },
   below_issuer_minimum: {
     name: 'Issuer minimum order',
-    explanation: 'Blocks orders that would be rejected by the issuer minimum ($5 on Ondo).',
-    threshold: '$5.00 Ondo / $0.01 bStocks',
+    explanation: 'Blocks orders rejected by the issuer minimum ($5.00 on Ondo [40375]; no minimum on bStocks, tested live at $2.00).',
+    threshold: '$5.00 Ondo / > $0.00 bStocks ($0.01 tie-break floor)',
   },
   market_closed: {
     name: 'Trading session open',
@@ -58,8 +59,8 @@ export const GUARD_RULE_DEFINITIONS: Record<
   },
   quality_unreliable: {
     name: 'Token price & ratio sanity',
-    explanation: 'Filters sub-$1.00 outlier feeds and unsupported share ratios outside 0.25-5.00x.',
-    threshold: '>= $1.00 & 0.25x-5.00x ratio',
+    explanation: 'Filters sub-$1.00 outlier feeds and unsupported share ratios outside 0.50-1.50x.',
+    threshold: '>= $1.00 & 0.50x-1.50x ratio',
   },
   depth_thin: {
     name: 'On-chain pool depth',
@@ -130,7 +131,7 @@ function deriveGuardChecks(
         const minStr = q.token?.issuer === 'ondo' ? '$5.00 Ondo minimum' : '$0.01 bStocks minimum'
         detail = `$${q.amount_usd.toFixed(2)} meets the ${minStr}`
       } else if (code === 'market_closed') {
-        detail = `Session active (${q.market.status})`
+        detail = `Session active (${humanizeStatus(q.market.status)})`
       } else if (code === 'reference_stale') {
         detail =
           q.reference_price_per_share !== null
@@ -140,11 +141,14 @@ function deriveGuardChecks(
         const ratio = selectedRow?.token_to_share_ratio
         detail =
           ratio !== null && ratio !== undefined
-            ? `Share ratio ${ratio.toFixed(4)}x within 0.25-5.00x`
-            : 'Within 0.25-5.00x ratio bounds'
+            ? `Share ratio ${ratio.toFixed(4)}x within 0.50-1.50x`
+            : 'Within 0.50-1.50x ratio bounds'
       } else if (code === 'depth_thin') {
+        const depthSourceLabel = selectedRow?.depth_source
+          ? humanizeStatus(selectedRow.depth_source)
+          : 'pool depth'
         detail = selectedRow?.depth_usd
-          ? `${formatCompactUsd(selectedRow.depth_usd)} (${selectedRow.depth_source || 'pool depth'})`
+          ? `${formatCompactUsd(selectedRow.depth_usd)} (${depthSourceLabel})`
           : 'Sufficient liquidity'
       } else if (code === 'slippage_too_high') {
         const spreadStr =
@@ -885,6 +889,7 @@ export default function Guard() {
                           Start the backend with your .env credentials:
                         </div>
                         <pre
+                          data-raw-code
                           className="m-0 text-xs font-mono overflow-x-auto leading-relaxed"
                           style={{ color: 'var(--text)' }}
                         >
@@ -1297,7 +1302,7 @@ DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend -
                                       <span style={{ color: 'var(--good)' }}>Eligible</span>
                                     ) : (
                                       <span style={{ color: 'var(--bad)' }}>
-                                        {row.refusal_code}: {row.refusal_message}
+                                        {humanizeCode(row.refusal_code)}: {row.refusal_message}
                                       </span>
                                     )}
                                   </td>
@@ -1345,7 +1350,7 @@ DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend -
                               color: 'var(--text)',
                             }}
                           >
-                            {quote.refusal.code}
+                            {humanizeCode(quote.refusal.code)}
                           </span>
                         )}
                       </div>
@@ -1520,7 +1525,7 @@ DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend -
                                   </td>
                                   <td className="py-2.5 pl-2">
                                     <span style={{ color: 'var(--bad)' }}>
-                                      {row.refusal_code}: {row.refusal_message}
+                                      {humanizeCode(row.refusal_code)}: {row.refusal_message}
                                     </span>
                                   </td>
                                 </tr>

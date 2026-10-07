@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { fetchQuote } from '../api'
 import { Footer, TopHeader } from '../components/shared'
+import { humanizeField } from '../lib/humanize'
 import type { QuoteVerdictResponse } from '../types'
 
 const DEFAULT_API_URL = 'http://localhost:8000'
@@ -17,9 +18,9 @@ const INTEGRATION_TABS: IntegrationTab[] = [
   {
     id: 'http',
     label: 'HTTP',
-    title: 'GET /api/quote (frozen schema_version "1")',
+    title: 'GET /api/quote (frozen schema version 1)',
     description:
-      'Call /api/quote before any tokenized stock purchase. Check verdict ("BUY" or "REFUSE") and token.address before building swap calldata.',
+      'Call /api/quote before any tokenized stock purchase. Check the verdict ("BUY" or "REFUSE") and token contract address before building swap calldata.',
     code: `curl -s "${DEFAULT_API_URL}/api/quote?ticker=NVDA&amount_usd=5.50" | jq .`,
   },
   {
@@ -35,7 +36,7 @@ const INTEGRATION_TABS: IntegrationTab[] = [
     label: 'MCP',
     title: 'Model Context Protocol server (stdio)',
     description:
-      'Expose bine_check(ticker, amount_usd) and bine_buy(ticker, amount_usd, confirm=False) to Claude Desktop, Cursor, or any MCP host.',
+      'Expose the Bine check and buy tools to Claude Desktop, Cursor, or any Model Context Protocol host.',
     code: JSON.stringify(
       {
         mcpServers: {
@@ -56,89 +57,110 @@ const INTEGRATION_TABS: IntegrationTab[] = [
     label: 'Agent skill',
     title: 'Binance Agentic Wallet skill (SKILL.md)',
     description:
-      'Install the skill file so autonomous agents using @binance/agentic-wallet (baw) always run bine check and verify token.address before baw market-order swap.',
+      'Install the skill file so autonomous agents using @binance/agentic-wallet (baw) always run bine check and verify the token address before baw market-order swap.',
     code: `mkdir -p ~/.claude/skills/bine-pre-trade-guard && cp skills/bine-pre-trade-guard/SKILL.md ~/.claude/skills/bine-pre-trade-guard/SKILL.md`,
   },
 ]
 
-const RESPONSE_FIELDS = [
+export const RESPONSE_FIELDS = [
   {
-    field: 'schema_version',
+    key: 'schema_version',
+    label: humanizeField('schema_version'),
     type: '"1"',
     meaning: 'Frozen contract version string. Always "1".',
+    sample: '"1"',
   },
   {
-    field: 'ticker',
+    key: 'ticker',
+    label: humanizeField('ticker'),
     type: 'string',
     meaning: 'Normalized underlying equity ticker (for example "NVDA" or "SPY").',
+    sample: '"NVDA"',
   },
   {
-    field: 'amount_usd',
+    key: 'amount_usd',
+    label: humanizeField('amount_usd'),
     type: 'number',
     meaning: 'Requested order size in USD (USDT equivalent on BNB Chain).',
+    sample: '5.5',
   },
   {
-    field: 'quoted_at',
+    key: 'quoted_at',
+    label: humanizeField('quoted_at'),
     type: 'string (ISO-8601 UTC)',
     meaning: 'UTC timestamp when the live quote was evaluated.',
+    sample: '"2026-10-05T15:04:08Z"',
   },
   {
-    field: 'verdict',
+    key: 'verdict',
+    label: humanizeField('verdict'),
     type: '"BUY" | "REFUSE"',
-    meaning: 'Deterministic guard decision. Only proceed when verdict === "BUY".',
+    meaning: 'Deterministic guard decision. Only proceed when verdict is "BUY".',
+    sample: '"BUY"',
   },
   {
-    field: 'token',
+    key: 'token',
+    label: humanizeField('token'),
     type: '{ symbol, address, issuer } | null',
     meaning: 'Winning BSC token contract to buy, or null when verdict is "REFUSE".',
+    sample: '{"symbol":"NVDAB","address":"0xA923...2246","issuer":"bstock"}',
   },
   {
-    field: 'shares',
+    key: 'shares',
+    label: humanizeField('shares'),
     type: 'number | null',
-    meaning: 'Expected share-adjusted equity units received after tokenToShareRatio.',
+    meaning: 'Expected share-adjusted equity units received after applying the token-to-share ratio.',
+    sample: '0.030956',
   },
   {
-    field: 'all_in_price_per_share',
+    key: 'all_in_price_per_share',
+    label: humanizeField('all_in_price_per_share'),
     type: 'number | null',
     meaning: 'All-in effective execution price per share in USD including fees and gas.',
+    sample: '177.67',
   },
   {
-    field: 'reference_price_per_share',
+    key: 'reference_price_per_share',
+    label: humanizeField('reference_price_per_share'),
     type: 'number | null',
     meaning: 'Catalog per-share reference price in USD.',
+    sample: '177.82',
   },
   {
-    field: 'spread_pct',
+    key: 'spread_pct',
+    label: humanizeField('spread_pct'),
     type: 'number | null',
-    meaning: 'All-in percentage spread versus reference_price_per_share.',
+    meaning: 'All-in percentage spread versus the per-share reference price.',
+    sample: '-0.08',
   },
   {
-    field: 'refusal',
+    key: 'refusal',
+    label: humanizeField('refusal'),
     type: '{ code, message } | null',
-    meaning: 'Machine-readable refusal code (1 of 8) and one-sentence explanation when verdict is "REFUSE".',
+    meaning: 'Refusal rule and one-sentence explanation when verdict is "REFUSE".',
+    sample: 'null',
   },
   {
-    field: 'alternative',
+    key: 'alternative',
+    label: humanizeField('alternative'),
     type: '{ symbol, issuer, eligible, note } | null',
     meaning: 'Comparison note for the second issuer (including 5 bps tiebreak status).',
+    sample: '{"symbol":"NVDAon","issuer":"ondo","eligible":true,"note":"NVDAB selected via 5 bps tiebreak"}',
   },
   {
-    field: 'market',
+    key: 'market',
+    label: humanizeField('market'),
     type: '{ status, open }',
     meaning: 'Current RWA session state ("regular", "premarket", "postmarket", "overnight", "offhours", or "paused").',
-  },
-  {
-    field: 'details (optional)',
-    type: '{ tiebreak_applied, live_execution_allowed, max_live_trade_usd, issuers }',
-    meaning: 'Included when ?details=true is passed; lists per-issuer depth, slippage, route, and BscTrace links.',
+    sample: '{"status":"regular","open":true}',
   },
 ]
 
 const ERROR_ROWS = [
   {
     status: '401 / 403',
-    meaning: 'Missing or invalid X-Bine-Admin-Token on POST /api/execute with execute_live=true.',
-    action: 'Keep execute_live=false for dry-run simulations, or pass the configured X-Bine-Admin-Token header on your own local instance.',
+    meaning: 'Missing or invalid X-Bine-Admin-Token header on POST /api/execute when live execution is requested.',
+    action: 'Keep live execution disabled for dry-run simulations, or pass the configured X-Bine-Admin-Token header on your own local instance.',
   },
   {
     status: '429',
@@ -148,7 +170,7 @@ const ERROR_ROWS = [
   {
     status: '503',
     meaning: 'Binance API keys missing or rejected, or upstream web3.binance.com is unreachable.',
-    action: 'Set BINANCE_API_KEY and BINANCE_SECRET_KEY in .env (and DEV_DNS_FALLBACK=true if local DNS times out) and restart uvicorn.',
+    action: 'Configure your Binance API credentials in .env (and enable the local DNS fallback flag if DNS times out) and restart uvicorn.',
   },
 ]
 
@@ -314,6 +336,7 @@ export default function Integrate() {
                 </div>
 
                 <pre
+                  data-raw-code
                   className="p-4 rounded-xl text-xs font-mono overflow-x-auto m-0"
                   style={{
                     backgroundColor: 'var(--surface-subtle)',
@@ -327,10 +350,11 @@ export default function Integrate() {
                 {activeTab.id === 'http' && (tryResult || tryError) && (
                   <div className="space-y-2 pt-2" aria-live="polite">
                     <div className="flex items-center justify-between text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                      <span>Live response from GET /api/quote?ticker=NVDA&amp;amount_usd=5.50</span>
+                      <span>Live response for NVDA ($5.50 USD)</span>
                       {tryResult && <span>verdict: {tryResult.verdict}</span>}
                     </div>
                     <pre
+                      data-raw-code
                       className="p-4 rounded-xl text-xs font-mono overflow-x-auto m-0 max-h-[340px]"
                       style={{
                         backgroundColor: 'var(--surface-subtle)',
@@ -354,7 +378,7 @@ export default function Integrate() {
                   Response fields (GET /api/quote)
                 </h2>
                 <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                  13 top-level frozen keys + optional details
+                  13 top-level frozen fields
                 </span>
               </div>
 
@@ -371,14 +395,14 @@ export default function Integrate() {
                       >
                         <th className="py-3 px-4 font-medium">Field</th>
                         <th className="py-3 px-4 font-medium">Type</th>
-                        <th className="py-3 px-4 font-medium">Description</th>
+                        <th className="py-3 px-4 font-medium">Meaning</th>
                       </tr>
                     </thead>
                     <tbody>
                       {RESPONSE_FIELDS.map(row => (
-                        <tr key={row.field} style={{ borderBottom: '1px solid var(--hairline)' }}>
-                          <td className="py-3 px-4 font-mono text-xs font-semibold whitespace-nowrap">
-                            {row.field}
+                        <tr key={row.key} style={{ borderBottom: '1px solid var(--hairline)' }}>
+                          <td className="py-3 px-4 text-xs font-semibold whitespace-nowrap">
+                            {row.label}
                           </td>
                           <td className="py-3 px-4 font-mono text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
                             {row.type}
@@ -444,13 +468,13 @@ export default function Integrate() {
               <ul className="m-0 pl-5 space-y-1.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 <li>
                   <strong style={{ color: 'var(--text)' }}>Frozen schema:</strong>{' '}
-                  <code className="font-mono text-xs">schema_version: &quot;1&quot;</code> is frozen. Field names and refusal codes do not change across releases.
+                  Schema version 1 is frozen. Field names and refusal codes do not change across releases.
                 </li>
                 <li>
                   <strong style={{ color: 'var(--text)' }}>Scope:</strong> Spot tokenized stocks on BNB Smart Chain (<code className="font-mono text-xs">chainId = 56</code>) across Ondo Global Markets and bStocks.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--text)' }}>Hard execution caps:</strong> Dry-run via the Binance Transaction API runs before any swap; live swaps require <code className="font-mono text-xs">BINE_LIVE_MODE=true</code> and stay capped at <code className="font-mono text-xs">$6.00</code> per trade and <code className="font-mono text-xs">$10.00</code> per day.
+                  <strong style={{ color: 'var(--text)' }}>Hard execution caps:</strong> Dry-run via the Binance Transaction API runs before any swap; live swaps require live mode enabled on your local server and stay capped at <code className="font-mono text-xs">$6.00</code> per trade and <code className="font-mono text-xs">$10.00</code> per day.
                 </li>
               </ul>
             </section>

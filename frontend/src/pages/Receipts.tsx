@@ -9,6 +9,7 @@ import {
   shortAddress,
 } from '../components/shared'
 import onchainReceipts from '../data/onchain-receipts.json'
+import { humanizeStatus } from '../lib/humanize'
 
 interface EnrichedReceipt {
   decision_id: number
@@ -203,7 +204,7 @@ export default function Receipts() {
                     className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-semibold"
                     style={{ backgroundColor: 'var(--chip-bad-bg)', color: 'var(--bad)' }}
                   >
-                    LOAD_ERROR
+                    {humanizeStatus('LOAD_ERROR')}
                   </span>
                   <span className="text-sm font-semibold">Could not load decision log</span>
                 </div>
@@ -339,7 +340,7 @@ export default function Receipts() {
                               <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                                 {row.reference_price_per_share_usd !== null
                                   ? `Ref $${row.reference_price_per_share_usd.toFixed(2)} (+${row.spread_pct?.toFixed(2)}%)`
-                                  : `Session: ${row.session_status}`}
+                                  : `Session: ${humanizeStatus(row.session_status)}`}
                               </div>
                             </div>
 
@@ -380,7 +381,7 @@ export default function Receipts() {
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                               <div className="break-all">
-                                <span style={{ color: 'var(--text-secondary)' }}>tx_hash: </span>
+                                <span style={{ color: 'var(--text-secondary)' }}>Transaction hash: </span>
                                 <span>{row.tx_hash}</span>
                               </div>
                               <button
@@ -400,7 +401,7 @@ export default function Receipts() {
 
                             {row.approve_tx_hash && (
                               <div className="break-all">
-                                <span style={{ color: 'var(--text-secondary)' }}>approve_tx_hash: </span>
+                                <span style={{ color: 'var(--text-secondary)' }}>Approval transaction hash: </span>
                                 <a
                                   href={`https://bsctrace.com/tx/${row.approve_tx_hash}`}
                                   target="_blank"
@@ -414,7 +415,7 @@ export default function Receipts() {
                             )}
 
                             <div>
-                              <span style={{ color: 'var(--text-secondary)' }}>dry_run_sequence: </span>
+                              <span style={{ color: 'var(--text-secondary)' }}>Dry-run sequence: </span>
                               <span>{row.preceding_dry_run_note}</span>
                             </div>
                           </div>

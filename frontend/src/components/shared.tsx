@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { executeTrade, fetchDecisions, fetchHealth } from '../api'
 import type { ExecuteTradeResponse, QuoteVerdictResponse } from '../types'
 import { BineWordmarkLockup } from './BineLogo'
+import { humanizeStatus } from '../lib/humanize'
 
 export function parseUtcDate(iso: string): Date {
   const normalized = /[Z+-]\d*:*\d*$/.test(iso) ? iso : `${iso}Z`
@@ -79,7 +80,7 @@ export function formatSimulationStatus(status: string | null | undefined): {
       tooltip: SIM_ROUTER_TOOLTIP,
     }
   }
-  return { label: status }
+  return { label: humanizeStatus(status) }
 }
 
 /** Inlined from simple-icons/icons/github.svg */
@@ -498,7 +499,7 @@ export function LiveExecutionControl({
         setStage('filled')
       } else {
         setStage('failed')
-        setLiveError(res.execution.detail || 'Live execution did not return a confirmed tx_hash.')
+        setLiveError(res.execution.detail || 'Live execution did not return a confirmed transaction hash.')
       }
       await fetchDecisions(5)
       onTradeComplete?.(res)

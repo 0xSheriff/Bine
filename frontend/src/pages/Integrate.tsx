@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { fetchQuote } from '../api'
+import { usePrefersReducedMotion } from '../components/BineLogo'
+import { GlassDetailPanel, runGlassViewTransition } from '../components/GlassStack'
 import { Footer, TopHeader } from '../components/shared'
 import { humanizeField } from '../lib/humanize'
 import type { QuoteVerdictResponse } from '../types'
@@ -175,15 +177,24 @@ const ERROR_ROWS = [
 ]
 
 export default function Integrate() {
+  const reducedMotion = usePrefersReducedMotion()
   const [activeIndex, setActiveIndex] = useState<number>(0)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [tryLoading, setTryLoading] = useState<boolean>(false)
   const [tryResult, setTryResult] = useState<QuoteVerdictResponse | null>(null)
   const [tryError, setTryError] = useState<string | null>(null)
+  const [openFieldKey, setOpenFieldKey] = useState<string | null>('verdict')
 
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const fieldTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const activeTab = INTEGRATION_TABS[activeIndex]
+  const activeField = RESPONSE_FIELDS.find(f => f.key === openFieldKey) ?? null
+  const activeFieldTriggerRef = {
+    get current() {
+      return openFieldKey ? fieldTriggerRefs.current[openFieldKey] ?? null : null
+    },
+  }
 
   const handleCopy = async (id: string, text: string) => {
     try {
@@ -378,7 +389,7 @@ export default function Integrate() {
                   Response fields (GET /api/quote)
                 </h2>
                 <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                  13 top-level frozen fields
+                  Click any field to inspect a sample value from /api/quote
                 </span>
               </div>
 
@@ -396,26 +407,81 @@ export default function Integrate() {
                         <th className="py-3 px-4 font-medium">Field</th>
                         <th className="py-3 px-4 font-medium">Type</th>
                         <th className="py-3 px-4 font-medium">Meaning</th>
+                        <th className="py-3 px-4 font-medium text-right">Sample</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {RESPONSE_FIELDS.map(row => (
-                        <tr key={row.key} style={{ borderBottom: '1px solid var(--hairline)' }}>
-                          <td className="py-3 px-4 text-xs font-semibold whitespace-nowrap">
-                            {row.label}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                            {row.type}
-                          </td>
-                          <td className="py-3 px-4" style={{ color: 'var(--text-secondary)' }}>
-                            {row.meaning}
-                          </td>
-                        </tr>
-                      ))}
+                      {RESPONSE_FIELDS.map(row => {
+                        const isOpen = openFieldKey === row.key
+                        return (
+                          <tr
+                            key={row.key}
+                            style={{
+                              borderBottom: '1px solid var(--hairline)',
+                              backgroundColor: isOpen ? 'var(--surface-subtle)' : 'transparent',
+                            }}
+                          >
+                            <td className="py-3 px-4 text-xs font-semibold whitespace-nowrap">
+                              {row.label}
+                            </td>
+                            <td className="py-3 px-4 font-mono text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                              {row.type}
+                            </td>
+                            <td className="py-3 px-4" style={{ color: 'var(--text-secondary)' }}>
+                              {row.meaning}
+                            </td>
+                            <td className="py-2 px-4 text-right whitespace-nowrap">
+                              <button
+                                ref={el => {
+                                  fieldTriggerRefs.current[row.key] = el
+                                }}
+                                type="button"
+                                aria-expanded={isOpen}
+                                aria-controls={`field-glass-${row.key}`}
+                                onClick={() =>
+                                  runGlassViewTransition(() => {
+                                    setOpenFieldKey(prev => (prev === row.key ? null : row.key))
+                                  }, reducedMotion)
+                                }
+                                className="bine-pill-secondary px-3 min-h-[44px] text-xs font-medium cursor-pointer"
+                              >
+                                {isOpen ? 'Hide' : 'Sample'}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
+
+              {activeField && (
+                <GlassDetailPanel
+                  id={`field-glass-${activeField.key}`}
+                  isOpen={true}
+                  onClose={() =>
+                    runGlassViewTransition(() => {
+                      setOpenFieldKey(null)
+                    }, reducedMotion)
+                  }
+                  title={activeField.label}
+                  subtitle={`Type: ${activeField.type}`}
+                  triggerRef={activeFieldTriggerRef}
+                >
+                  <p className="m-0">{activeField.meaning}</p>
+                  <pre
+                    data-raw-code
+                    className="p-3.5 rounded-xl text-xs font-mono overflow-x-auto m-0"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <code>{`"${activeField.key}": ${activeField.sample}`}</code>
+                  </pre>
+                </GlassDetailPanel>
+              )}
             </section>
 
             {/* 3. HTTP Errors Table */}

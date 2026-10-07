@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchDecisions } from '../api'
+import { usePrefersReducedMotion } from '../components/BineLogo'
+import { GlassDetailPanel, runGlassViewTransition } from '../components/GlassStack'
 import {
   Footer,
   TopHeader,
@@ -39,8 +41,10 @@ interface EnrichedReceipt {
 }
 
 export default function Receipts() {
-  const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({ 18: true })
+  const reducedMotion = usePrefersReducedMotion()
+  const [openDecisionId, setOpenDecisionId] = useState<number | null>(18)
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
+  const triggerRefs = useRef<Record<number, HTMLButtonElement | null>>({})
 
   const forceEmpty =
     typeof window !== 'undefined' &&
@@ -58,7 +62,9 @@ export default function Receipts() {
   })
 
   const toggleExpand = (id: number) => {
-    setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }))
+    runGlassViewTransition(() => {
+      setOpenDecisionId(prev => (prev === id ? null : id))
+    }, reducedMotion)
   }
 
   const handleCopyHash = async (hash: string) => {
@@ -238,13 +244,18 @@ export default function Receipts() {
             ) : (
               <div className="space-y-4">
                 {displayReceipts.map(row => {
-                  const isOpen = Boolean(expandedIds[row.decision_id])
+                  const isOpen = openDecisionId === row.decision_id
                   const isCopied = copiedHash === row.tx_hash
+                  const triggerRef = {
+                    get current() {
+                      return triggerRefs.current[row.decision_id] ?? null
+                    },
+                  }
 
                   return (
-                    <article key={row.decision_id} className="bine-card overflow-hidden">
+                    <article key={row.decision_id} className="bine-card p-5 sm:p-6">
                       {/* Expandable Header Row */}
-                      <div className="p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="space-y-1.5 min-w-0">
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <span
@@ -286,6 +297,9 @@ export default function Receipts() {
                           </a>
 
                           <button
+                            ref={el => {
+                              triggerRefs.current[row.decision_id] = el
+                            }}
                             type="button"
                             onClick={() => toggleExpand(row.decision_id)}
                             aria-expanded={isOpen}
@@ -298,129 +312,131 @@ export default function Receipts() {
                         </div>
                       </div>
 
-                      {/* Expanded Details */}
-                      {isOpen && (
-                        <div
-                          id={`receipt-details-${row.decision_id}`}
-                          className="px-5 pb-6 pt-5 space-y-5 text-sm"
-                          style={{
-                            borderTop: '1px solid var(--hairline)',
-                            backgroundColor: 'var(--surface-subtle)',
-                          }}
-                        >
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                            <div
-                              className="rounded-xl p-3.5"
-                              style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
-                            >
-                              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                Shares filled vs quoted
-                              </div>
-                              <div className="text-sm font-mono font-semibold mt-1">
-                                {row.filled_shares !== null ? row.filled_shares.toFixed(6) : 'N/A'} /{' '}
-                                {row.quoted_shares !== null ? row.quoted_shares.toFixed(6) : 'N/A'}
-                              </div>
-                              <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                {row.fill_diff_bps !== null ? `${row.fill_diff_bps} bps difference` : 'Exact match'}
-                              </div>
+                      {/* Expanded Liquid Glass Details */}
+                      <GlassDetailPanel
+                        id={`receipt-details-${row.decision_id}`}
+                        isOpen={isOpen}
+                        onClose={() =>
+                          runGlassViewTransition(() => {
+                            setOpenDecisionId(null)
+                          }, reducedMotion)
+                        }
+                        title={`Decision #${row.decision_id} · ${row.symbol} (${row.issuer})`}
+                        subtitle={formatAbsoluteAndRelative(row.created_at)}
+                        triggerRef={triggerRef}
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                          <div
+                            className="rounded-xl p-3.5"
+                            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                          >
+                            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              Shares filled vs quoted
                             </div>
-
-                            <div
-                              className="rounded-xl p-3.5"
-                              style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
-                            >
-                              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                All-in price per share
-                              </div>
-                              <div className="text-sm font-mono font-semibold mt-1">
-                                {row.all_in_price_per_share_usd !== null
-                                  ? `$${row.all_in_price_per_share_usd.toFixed(2)}`
-                                  : 'N/A'}
-                              </div>
-                              <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                {row.reference_price_per_share_usd !== null
-                                  ? `Ref $${row.reference_price_per_share_usd.toFixed(2)} (+${row.spread_pct?.toFixed(2)}%)`
-                                  : `Session: ${humanizeStatus(row.session_status)}`}
-                              </div>
+                            <div className="text-sm font-mono font-semibold mt-1">
+                              {row.filled_shares !== null ? row.filled_shares.toFixed(6) : 'N/A'} /{' '}
+                              {row.quoted_shares !== null ? row.quoted_shares.toFixed(6) : 'N/A'}
                             </div>
-
-                            <div
-                              className="rounded-xl p-3.5"
-                              style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
-                            >
-                              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                Block &amp; BNB gas
-                              </div>
-                              <div className="text-sm font-mono font-semibold mt-1">
-                                Block #{row.block_number ?? 'N/A'}
-                              </div>
-                              <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                {row.gas_bnb !== null ? `${row.gas_bnb.toFixed(8)} BNB` : 'N/A'}
-                              </div>
-                            </div>
-
-                            <div
-                              className="rounded-xl p-3.5"
-                              style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
-                            >
-                              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                Agentic Wallet order ID
-                              </div>
-                              <div className="text-sm font-mono font-semibold mt-1 break-all">
-                                {row.order_id}
-                              </div>
-                              <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                {row.execution_source}
-                              </div>
+                            <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                              {row.fill_diff_bps !== null ? `${row.fill_diff_bps} bps difference` : 'Exact match'}
                             </div>
                           </div>
 
                           <div
-                            className="rounded-xl p-4 space-y-2.5 text-xs font-mono"
+                            className="rounded-xl p-3.5"
                             style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
                           >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div className="break-all">
-                                <span style={{ color: 'var(--text-secondary)' }}>Transaction hash: </span>
-                                <span>{row.tx_hash}</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyHash(row.tx_hash)}
-                                className="bine-pill-secondary cursor-pointer shrink-0 self-start sm:self-auto min-h-[44px]"
-                                style={{
-                                  height: '44px',
-                                  padding: '0 16px',
-                                  fontSize: '12px',
-                                  color: isCopied ? 'var(--good)' : 'var(--text)',
-                                }}
-                              >
-                                {isCopied ? 'Copied' : 'Copy tx hash'}
-                              </button>
+                            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              All-in price per share
                             </div>
+                            <div className="text-sm font-mono font-semibold mt-1">
+                              {row.all_in_price_per_share_usd !== null
+                                ? `$${row.all_in_price_per_share_usd.toFixed(2)}`
+                                : 'N/A'}
+                            </div>
+                            <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                              {row.reference_price_per_share_usd !== null
+                                ? `Ref $${row.reference_price_per_share_usd.toFixed(2)} (+${row.spread_pct?.toFixed(2)}%)`
+                                : `Session: ${humanizeStatus(row.session_status)}`}
+                            </div>
+                          </div>
 
-                            {row.approve_tx_hash && (
-                              <div className="break-all">
-                                <span style={{ color: 'var(--text-secondary)' }}>Approval transaction hash: </span>
-                                <a
-                                  href={`https://bsctrace.com/tx/${row.approve_tx_hash}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline"
-                                  style={{ color: 'var(--text)' }}
-                                >
-                                  {row.approve_tx_hash}
-                                </a>
-                              </div>
-                            )}
+                          <div
+                            className="rounded-xl p-3.5"
+                            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                          >
+                            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              Block &amp; BNB gas
+                            </div>
+                            <div className="text-sm font-mono font-semibold mt-1">
+                              Block #{row.block_number ?? 'N/A'}
+                            </div>
+                            <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                              {row.gas_bnb !== null ? `${row.gas_bnb.toFixed(8)} BNB` : 'N/A'}
+                            </div>
+                          </div>
 
-                            <div>
-                              <span style={{ color: 'var(--text-secondary)' }}>Dry-run sequence: </span>
-                              <span>{row.preceding_dry_run_note}</span>
+                          <div
+                            className="rounded-xl p-3.5"
+                            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                          >
+                            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              Agentic Wallet order ID
+                            </div>
+                            <div className="text-sm font-mono font-semibold mt-1 break-all">
+                              {row.order_id}
+                            </div>
+                            <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                              {row.execution_source}
                             </div>
                           </div>
                         </div>
-                      )}
+
+                        <div
+                          className="rounded-xl p-4 space-y-2.5 text-xs font-mono"
+                          style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="break-all">
+                              <span style={{ color: 'var(--text-secondary)' }}>Transaction hash: </span>
+                              <span>{row.tx_hash}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyHash(row.tx_hash)}
+                              className="bine-pill-secondary cursor-pointer shrink-0 self-start sm:self-auto min-h-[44px]"
+                              style={{
+                                height: '44px',
+                                padding: '0 16px',
+                                fontSize: '12px',
+                                color: isCopied ? 'var(--good)' : 'var(--text)',
+                              }}
+                            >
+                              {isCopied ? 'Copied' : 'Copy tx hash'}
+                            </button>
+                          </div>
+
+                          {row.approve_tx_hash && (
+                            <div className="break-all">
+                              <span style={{ color: 'var(--text-secondary)' }}>Approval transaction hash: </span>
+                              <a
+                                href={`https://bsctrace.com/tx/${row.approve_tx_hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline"
+                                style={{ color: 'var(--text)' }}
+                              >
+                                {row.approve_tx_hash}
+                              </a>
+                            </div>
+                          )}
+
+                          <div>
+                            <span style={{ color: 'var(--text-secondary)' }}>Dry-run sequence: </span>
+                            <span>{row.preceding_dry_run_note}</span>
+                          </div>
+                        </div>
+                      </GlassDetailPanel>
                     </article>
                   )
                 })}

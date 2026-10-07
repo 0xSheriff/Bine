@@ -306,6 +306,79 @@ details > summary::-webkit-details-marker {
   animation: bine-skeleton-fade 1.6s var(--ease-out-expo) infinite;
 }
 
+/* Liquid Glass on Click (Phase C) */
+.bine-glass-trigger {
+  border: 1px solid transparent;
+  transition:
+    transform 180ms var(--ease-out-expo),
+    box-shadow 180ms var(--ease-out-expo),
+    border-color 180ms var(--ease-out-expo);
+}
+
+.bine-glass-trigger-active {
+  border-color: var(--text);
+}
+
+.bine-glass-panel {
+  --mx: 50%;
+  --my: 0%;
+  position: relative;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  background:
+    radial-gradient(240px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.22), transparent 100%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.36));
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 20px 50px rgba(15, 17, 21, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(15, 17, 21, 0.06);
+  will-change: transform, opacity;
+}
+
+/* Chromium supports SVG displacement filter inside backdrop-filter */
+@supports (backdrop-filter: url(#bine-glass)) {
+  .bine-glass-panel {
+    backdrop-filter: url(#bine-glass) blur(22px) saturate(180%);
+  }
+}
+
+[data-theme="dark"] .bine-glass-panel {
+  background:
+    radial-gradient(240px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.22), transparent 100%),
+    linear-gradient(135deg, rgba(28, 31, 40, 0.72), rgba(18, 20, 28, 0.44));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 2, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Interior readability scrim so body text stays >= 4.5:1 over any background including lavender ring */
+.bine-glass-scrim {
+  position: relative;
+  z-index: 1;
+  border-radius: calc(var(--card-radius) - 4px);
+  padding: 16px;
+  background-color: rgba(255, 255, 255, 0.78);
+}
+
+[data-theme="dark"] .bine-glass-scrim {
+  background-color: rgba(14, 16, 22, 0.80);
+}
+
+/* At 390px / mobile (< 640px), expanded glass panels behave as a scrollable bottom sheet or bounded sheet */
+@media (max-width: 639px) {
+  .bine-glass-panel {
+    max-height: 75vh;
+    overflow-y: auto;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -313,7 +386,9 @@ details > summary::-webkit-details-marker {
   .bine-pill-primary,
   .bine-pill-secondary,
   .bine-coin-motion,
-  .bine-skeleton {
+  .bine-skeleton,
+  .bine-glass-trigger,
+  .bine-glass-panel {
     animation: none !important;
     transition: none !important;
   }

@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { fetchDecisions, fetchTickers } from '../api'
 import { usePrefersReducedMotion } from '../components/BineLogo'
+import { GlassStack, type GlassStackItem } from '../components/GlassStack'
 import { HeroArt } from '../components/HeroArt'
 import {
   Footer,
@@ -13,7 +14,7 @@ import {
 } from '../components/shared'
 import onchainReceipts from '../data/onchain-receipts.json'
 import recordedRefusals from '../data/recorded-refusals.json'
-import { humanizeCode, humanizeStatus } from '../lib/humanize'
+import { GUARD_RULE_DEFINITIONS, humanizeCode, humanizeStatus } from '../lib/humanize'
 
 const FEATURED_REFUSAL =
   recordedRefusals.find(item => item.id === 'spyon-slippage-250') ?? recordedRefusals[0]
@@ -47,6 +48,287 @@ export default function Home() {
   const tokensWatchedCount = tickerCatalog?.count ?? 448
   const verifiedSwapsCount =
     liveDecisions?.decisions?.filter(d => Boolean(d.tx_hash)).length || onchainReceipts.length
+
+  const issuerBreakdown = useMemo(() => {
+    const items = tickerCatalog?.tickers ?? []
+    let ondoTokens = 0
+    let bstockTokens = 0
+    let dualIssuerTickers = 0
+    for (const t of items) {
+      if (t.issuers.includes('ondo')) ondoTokens += 1
+      if (t.issuers.includes('bstock')) bstockTokens += 1
+      if (t.dual) dualIssuerTickers += 1
+    }
+    return {
+      ondoTokens: ondoTokens || 425,
+      bstockTokens: bstockTokens || 55,
+      dualIssuerTickers: dualIssuerTickers || 32,
+    }
+  }, [tickerCatalog])
+
+  const proofItems: GlassStackItem[] = [
+    {
+      id: 'tokens',
+      title: `${tokensWatchedCount} tokenized stock tickers watched on BNB Chain`,
+      subtitle: `${issuerBreakdown.ondoTokens} Ondo Global Markets contracts · ${issuerBreakdown.bstockTokens} bStocks contracts · ${issuerBreakdown.dualIssuerTickers} dual-issuer tickers`,
+      summary: (
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+            Tokens watched on BSC
+          </div>
+          <div className="text-2xl sm:text-3xl font-semibold font-mono mt-1" style={{ color: 'var(--text)' }}>
+            {tokensWatchedCount}
+          </div>
+          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Ondo Global Markets &amp; bStocks
+          </div>
+        </div>
+      ),
+      detail: (
+        <div className="space-y-3">
+          <p className="m-0">
+            Bine indexes every tokenized equity and ETF returned by the Binance Web3 RWA catalog on BNB Smart Chain (chain ID 56) across both supported issuers:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+            <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-secondary)' }}>Ondo Global Markets</div>
+              <div className="text-base font-semibold mt-0.5">{issuerBreakdown.ondoTokens} tokens</div>
+              <div style={{ color: 'var(--text-secondary)' }}>Minimum order $5.00 USD</div>
+            </div>
+            <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-secondary)' }}>bStocks (Backed)</div>
+              <div className="text-base font-semibold mt-0.5">{issuerBreakdown.bstockTokens} tokens</div>
+              <div style={{ color: 'var(--text-secondary)' }}>Verified live at $2.00 USD</div>
+            </div>
+            <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-secondary)' }}>Dual-issuer overlap</div>
+              <div className="text-base font-semibold mt-0.5">{issuerBreakdown.dualIssuerTickers} tickers</div>
+              <div style={{ color: 'var(--text-secondary)' }}>5 bps tie-break rule</div>
+            </div>
+          </div>
+          <div className="pt-1">
+            <a
+              href="/guard"
+              onClick={e => navigateApp('/guard', e)}
+              className="bine-pill-primary min-h-[44px] px-5 text-xs"
+            >
+              Open Guard &rarr;
+            </a>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'rules',
+      title: '8 deterministic pre-trade guard rules',
+      subtitle: 'Evaluated sequentially on every GET /api/quote request',
+      summary: (
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+            Guard rules active
+          </div>
+          <div className="text-2xl sm:text-3xl font-semibold font-mono mt-1" style={{ color: 'var(--text)' }}>
+            8
+          </div>
+          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Deterministic pre-trade checks
+          </div>
+        </div>
+      ),
+      detail: (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+            {Object.entries(GUARD_RULE_DEFINITIONS).map(([code, rule]) => (
+              <div
+                key={code}
+                className="p-3 rounded-xl flex items-start justify-between gap-2"
+                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+              >
+                <div>
+                  <div className="font-semibold" style={{ color: 'var(--text)' }}>
+                    {rule.name}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)' }}>{rule.explanation}</div>
+                </div>
+                <span className="font-mono shrink-0" style={{ color: 'var(--text)' }}>
+                  {rule.threshold}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="pt-1">
+            <a
+              href="/refusals"
+              onClick={e => navigateApp('/refusals', e)}
+              className="bine-pill-secondary min-h-[44px] px-5 text-xs"
+            >
+              See all 6 recorded refusals &rarr;
+            </a>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'swaps',
+      title: `${verifiedSwapsCount} verified mainnet swaps on BNB Chain`,
+      subtitle: 'Executed via Binance Agentic Wallet after passing Transaction API dry-run',
+      summary: (
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+            On-chain swaps verified
+          </div>
+          <div className="text-2xl sm:text-3xl font-semibold font-mono mt-1" style={{ color: 'var(--text)' }}>
+            {verifiedSwapsCount}
+          </div>
+          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Real USDT to NVDAB fills on BSC
+          </div>
+        </div>
+      ),
+      detail: (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {onchainReceipts.map(r => (
+              <div
+                key={r.decision_id}
+                className="p-3.5 rounded-xl space-y-1.5"
+                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+              >
+                <div className="flex items-center justify-between gap-2 font-mono font-semibold">
+                  <span>Decision #{r.decision_id} · ${r.amount_usd.toFixed(2)} USDT &rarr; {r.symbol}</span>
+                  <span>Block #{r.block_number}</span>
+                </div>
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  Filled {r.filled_shares.toFixed(6)} vs {r.quoted_shares.toFixed(6)} quoted ({r.fill_diff_bps} bps) · Gas {r.gas_bnb.toFixed(8)} BNB
+                </div>
+                <div className="font-mono">
+                  <a
+                    href={r.bsctrace_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    BscTrace {shortAddress(r.tx_hash)} &#8599;
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="pt-1">
+            <a
+              href="/receipts"
+              onClick={e => navigateApp('/receipts', e)}
+              className="bine-pill-secondary min-h-[44px] px-5 text-xs"
+            >
+              Inspect full receipts &rarr;
+            </a>
+          </div>
+        </div>
+      ),
+    },
+  ]
+
+  const howItWorksItems: GlassStackItem[] = [
+    {
+      id: 'step-check',
+      title: '1. Check: Multi-issuer BNB Chain quote normalization',
+      subtitle: 'Ondo Global Markets + bStocks catalog and DEX aggregator quote',
+      summary: (
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-8 h-8 rounded-lg inline-flex items-center justify-center"
+              style={{ backgroundColor: 'var(--surface-subtle)', border: '1px solid var(--border)' }}
+              aria-hidden="true"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+              </svg>
+            </span>
+            <h3 className="text-base font-semibold m-0">1. Check</h3>
+          </div>
+          <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            Fetch live quotes across Ondo Global Markets and bStocks on BNB Chain and compute share-adjusted all-in price per share.
+          </p>
+        </div>
+      ),
+      detail: (
+        <div className="space-y-2">
+          <p className="m-0">
+            For any ticker such as NVDA or SPY, Bine queries both Ondo Global Markets and bStocks contracts on BNB Smart Chain, divides raw token output by the catalog share ratio, and computes the true all-in USD price per underlying share.
+          </p>
+          <p className="m-0 text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+            Tie-break rule: when both issuers pass all 8 checks and their all-in share prices are within 5 bps (0.05%), Bine selects the issuer with the lower minimum order floor.
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'step-guard',
+      title: '2. Guard: 8 deterministic pre-trade safety gates',
+      subtitle: 'Zero silent fallbacks on thin liquidity, closed sessions, or share-ratio traps',
+      summary: (
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-8 h-8 rounded-lg inline-flex items-center justify-center"
+              style={{ backgroundColor: 'var(--surface-subtle)', border: '1px solid var(--border)' }}
+              aria-hidden="true"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 3l7 4v5c0 4.5-3 8.5-7 9.5-4-1-7-5-7-9.5V7l7-4z" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <h3 className="text-base font-semibold m-0">2. Guard</h3>
+          </div>
+          <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            Enforce 8 pre-trade safety rules covering session status, share-ratio traps, minimum order sizes, pool depth, and spread caps.
+          </p>
+        </div>
+      ),
+      detail: (
+        <div className="space-y-2">
+          <p className="m-0">
+            Every quote is checked against the 1.00% maximum spread above stock reference, the 0.50x to 1.50x supported share-ratio window, the $10K AMM pool depth / $1M 24h volume floor, and active market session status. If any rule fails, Bine returns a structured refusal with the exact reason.
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'step-receipt',
+      title: '3. Receipt: Transaction API dry-run and SQLite audit log',
+      subtitle: 'Every decision and live fill is recorded with block, gas, and fill delta',
+      summary: (
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-8 h-8 rounded-lg inline-flex items-center justify-center"
+              style={{ backgroundColor: 'var(--surface-subtle)', border: '1px solid var(--border)' }}
+              aria-hidden="true"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <rect x="4" y="4" width="16" height="16" rx="3" />
+              </svg>
+            </span>
+            <h3 className="text-base font-semibold m-0">3. Receipt</h3>
+          </div>
+          <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            Simulate the unsigned transaction via the Binance Transaction API before any live Agentic Wallet swap and log the on-chain receipt.
+          </p>
+        </div>
+      ),
+      detail: (
+        <div className="space-y-2">
+          <p className="m-0">
+            Before any swap can execute, Bine simulates the unsigned swap calldata against the Binance Transaction API and logs a dry-run decision row in SQLite. Live swaps through Binance Agentic Wallet remain capped at $6.00 per trade and $10.00 per day.
+          </p>
+        </div>
+      ),
+    },
+  ]
 
   const sectionReveal = reducedMotion
     ? {}
@@ -121,20 +403,20 @@ export default function Home() {
                     className="bine-pill-secondary"
                     style={{
                       height: '52px',
-                      padding: '0 32px',
+                      padding: '0 30px',
                     }}
                   >
-                    Why Bine says no
+                    See live refusals
                   </a>
                 </motion.div>
 
                 <motion.p
-                  className="bine-body-copy m-0 mt-7 max-w-[520px]"
+                  className="bine-body-copy mt-6 mb-0 max-w-[520px]"
                   initial={reducedMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.6, delay: 0.21, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  Bine checks pool depth, all-in spread, share ratios, and session status on BNB Chain before you or your agent swap into a tokenized stock. When a route would fill badly, Bine refuses the trade and explains why in one sentence.
+                  Bine compares Ondo Global Markets and bStocks on BNB Chain, checks pool depth, spread, and market session, and returns BUY or REFUSE with one clear reason.
                 </motion.p>
               </div>
 
@@ -146,149 +428,32 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 2. PROOF STRIP */}
+        {/* 2. PROOF STRIP (GlassStack on click) */}
         <motion.section {...sectionReveal} className="py-6 sm:py-8">
           <div className="bine-container">
-            <div className="w-full max-w-[1240px] mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <a
-                href="/guard"
-                onClick={e => navigateApp('/guard', e)}
-                className="bine-card p-5 sm:p-6 flex items-center justify-between gap-4 no-underline transition-transform hover:-translate-y-0.5 min-h-[44px]"
-              >
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    Tokens watched on BSC
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-semibold font-mono mt-1" style={{ color: 'var(--text)' }}>
-                    {tokensWatchedCount}
-                  </div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    Ondo Global Markets &amp; bStocks
-                  </div>
-                </div>
-                <span className="text-sm font-medium shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                  Open guard &rarr;
-                </span>
-              </a>
-
-              <a
-                href="/refusals"
-                onClick={e => navigateApp('/refusals', e)}
-                className="bine-card p-5 sm:p-6 flex items-center justify-between gap-4 no-underline transition-transform hover:-translate-y-0.5 min-h-[44px]"
-              >
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    Guard rules active
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-semibold font-mono mt-1" style={{ color: 'var(--text)' }}>
-                    8
-                  </div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    Deterministic pre-trade checks
-                  </div>
-                </div>
-                <span className="text-sm font-medium shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                  See rules &rarr;
-                </span>
-              </a>
-
-              <a
-                href="/receipts"
-                onClick={e => navigateApp('/receipts', e)}
-                className="bine-card p-5 sm:p-6 flex items-center justify-between gap-4 no-underline transition-transform hover:-translate-y-0.5 min-h-[44px]"
-              >
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    On-chain swaps verified
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-semibold font-mono mt-1" style={{ color: 'var(--text)' }}>
-                    {verifiedSwapsCount}
-                  </div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    Real USDT to NVDAB fills on BSC
-                  </div>
-                </div>
-                <span className="text-sm font-medium shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                  Receipts &rarr;
-                </span>
-              </a>
+            <div className="w-full max-w-[1240px] mx-auto">
+              <GlassStack items={proofItems} columns={3} ariaLabel="Bine live proof metrics" />
             </div>
           </div>
         </motion.section>
 
-        {/* 3. HOW BINE WORKS (3 cards: Check, Guard, Receipt) */}
+        {/* 3. HOW BINE WORKS (GlassStack on click) */}
         <motion.section {...sectionReveal} className="py-10 sm:py-12">
           <div className="bine-container">
             <div className="w-full max-w-[1240px] mx-auto space-y-5">
               <div className="flex items-baseline justify-between gap-4 flex-wrap">
                 <h2 className="bine-section-heading m-0">How Bine works</h2>
                 <p className="text-sm m-0" style={{ color: 'var(--text-secondary)' }}>
-                  One decision pipeline across web, CLI, MCP, and Agentic Wallet skill.
+                  Click any step to inspect the underlying guard logic.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bine-card p-6 space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-8 h-8 rounded-lg inline-flex items-center justify-center"
-                      style={{ backgroundColor: 'var(--surface-subtle)', border: '1px solid var(--border)' }}
-                      aria-hidden="true"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
-                      </svg>
-                    </span>
-                    <h3 className="text-base font-semibold m-0">1. Check</h3>
-                  </div>
-                  <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    Fetch live quotes across Ondo Global Markets and bStocks on BNB Chain and compute share-adjusted all-in price per share.
-                  </p>
-                </div>
-
-                <div className="bine-card p-6 space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-8 h-8 rounded-lg inline-flex items-center justify-center"
-                      style={{ backgroundColor: 'var(--surface-subtle)', border: '1px solid var(--border)' }}
-                      aria-hidden="true"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 3l7 4v5c0 4.5-3 8.5-7 9.5-4-1-7-5-7-9.5V7l7-4z" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                    <h3 className="text-base font-semibold m-0">2. Guard</h3>
-                  </div>
-                  <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    Enforce 8 pre-trade safety rules covering session status, share-ratio traps, minimum order sizes, pool depth, and spread caps.
-                  </p>
-                </div>
-
-                <div className="bine-card p-6 space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-8 h-8 rounded-lg inline-flex items-center justify-center"
-                      style={{ backgroundColor: 'var(--surface-subtle)', border: '1px solid var(--border)' }}
-                      aria-hidden="true"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                        <rect x="4" y="4" width="16" height="16" rx="3" />
-                      </svg>
-                    </span>
-                    <h3 className="text-base font-semibold m-0">3. Receipt</h3>
-                  </div>
-                  <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    Simulate the unsigned transaction via the Binance Transaction API before any live Agentic Wallet swap and log the on-chain receipt.
-                  </p>
-                </div>
-              </div>
+              <GlassStack items={howItWorksItems} columns={3} ariaLabel="How Bine works steps" />
             </div>
           </div>
         </motion.section>
 
-        {/* 4. WHAT BINE REFUSES + 5. VERIFIED ON BNB CHAIN (Side by side at desktop so total height stays ~2.5 screens) */}
+        {/* 4. WHAT BINE REFUSES + 5. VERIFIED ON BNB CHAIN */}
         <motion.section {...sectionReveal} className="py-8 sm:py-10">
           <div className="bine-container">
             <div className="w-full max-w-[1240px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-5">

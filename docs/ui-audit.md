@@ -158,3 +158,42 @@ Screenshots inspected: `redesign_integrate_light_1440.png`, `redesign_integrate_
   4. Code blocks use `http://localhost:8000` as the default `BINE_API_URL` rather than dynamically substituting a remote host.
   5. Syntax highlighting is intentionally omitted in `<pre><code>` blocks to keep bundle weight zero-dependency and high-contrast in both themes.
 
+---
+
+## 4. Phase C Liquid Glass Interactive Stack & Performance Trace
+
+### 4.1 Liquid Glass Architecture (`frontend/src/components/GlassStack.tsx` + `frontend/src/index.css`)
+- **Two-Layer Readability Architecture**:
+  - **Outer Glass Frame (`.bine-glass-panel`)**: Translucent specular glass (`backdrop-filter: blur(22px) saturate(165%)`), progressive `@supports (backdrop-filter: url(#bine-glass))` Chromium SVG `<feTurbulence>` + `<feDisplacementMap>` edge refraction (`scale="6"`), top specular rim (`inset 0 1px 0`), inner rim (`inset 0 0 0 1px`), and radial cursor specular highlight (`--mx`, `--my` updated via `requestAnimationFrame`).
+  - **Inner Readability Scrim (`.bine-glass-scrim`)**: High-contrast surface (`rgba(255, 255, 255, 0.78)` in Light mode, `rgba(14, 16, 22, 0.80)` in Dark mode) behind all text, numbers, badges, and tables so text never sits directly on raw blurred background.
+- **Interactive Stack Behavior (`GlassStack`)**:
+  - One active card per stack (`aria-expanded`, `aria-controls`, `role="region"`), sibling recession (`opacity: 0.58; transform: scale(0.985)` on desktop/tablet), `Escape` and `Close` button dismissal returning focus to the triggering card, `document.startViewTransition` progressive enhancement, and `390px` mobile inline sheet expansion (`max-height: 78vh; overflow-y: auto`) without sibling scale transforms.
+- **Interactive Coverage Across All 5 Routes**:
+  1. `/` (`Home.tsx`): Proof strip cards (`448` tokens, `8` guard rules, `2` on-chain swaps) and `How Bine works` 3-step cards.
+  2. `/guard` (`Guard.tsx`): 5-metric grid tiles (`You receive`, `Price per share`, `Versus market price`, `Price impact`, `Pool depth`) and 8 Guard check pills.
+  3. `/refusals` (`Refusals.tsx`): 8-rule legend rows and 6 recorded empirical refusal cards.
+  4. `/receipts` (`Receipts.tsx`): Expandable on-chain receipt cards (`Decision #18` and `Decision #16`).
+  5. `/integrate` (`Integrate.tsx`): 13 `schema_version: "1"` response field rows with `[data-raw-code]` sample JSON.
+
+### 4.2 Before vs. After Load & Click Performance (`scripts/verify_glass_and_perf.py`)
+
+| Route | Metric | Phase 5 Baseline | Phase C (Liquid Glass) | Status |
+|---|---|---|---|---|
+| `/` (`Home`) | `first-paint` | `344 ms` | `324 ms` | Pass |
+| `/` (`Home`) | `first-contentful-paint` | `500 ms` | `596 ms` | Pass (`< 1.0s`) |
+| `/` (`Home`) | `domInteractive` | `66 ms` | `35 ms` | Pass |
+| `/` (`Home`) | `loadEventEnd` | `336 ms` | `322 ms` | Pass |
+| `/` (`Home`) | Click handler (`GlassStack` open) | N/A | `0.7 ms` (`0` long tasks `> 50 ms`) | Pass (`60 fps`) |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | `first-paint` | `92 ms` | `104 ms` | Pass |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | `first-contentful-paint` | `440 ms` | `480 ms` | Pass (`< 1.0s`) |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | `domInteractive` | `15 ms` | `19 ms` | Pass |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | `loadEventEnd` | `48 ms` | `53 ms` | Pass |
+| `/guard` (`?ticker=NVDA&amount=5.5`) | Click handler (`GlassStack` open) | N/A | `0.4 ms` (`0` long tasks `> 50 ms`) | Pass (`60 fps`) |
+
+### 4.3 Contrast, Overflow & Bundle Verification
+- **WCAG 2.2 AA Contrast inside `.bine-glass-scrim`**:
+  - Light mode: `rgb(10, 10, 10)` on `rgba(255, 255, 255, 0.78)` (`> 15:1`, pass `>= 4.5:1`).
+  - Dark mode: `rgb(245, 245, 245)` on `rgba(14, 16, 22, 0.80)` (`> 14:1`, pass `>= 4.5:1`).
+- **Horizontal Overflow (`scrollWidth <= innerWidth`)**: `0` failures across all 30 `glass_<page>_<theme>_<width>.png` screenshots (`390px`, `768px`, `1440px` in light and dark).
+- **Displayed Underscores (`scripts/check_underscores.py`)**: `TOTAL_UNDERSCORE_OFFENDERS=0` across all 16 route/state/theme combinations.
+- **Main JS Bundle Size**: `485.90 kB` raw (`< 500 kB` guardrail).

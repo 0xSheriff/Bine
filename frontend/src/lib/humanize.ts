@@ -98,3 +98,53 @@ export function humanizeField(field: string | null | undefined): string {
   const trimmed = String(field).trim();
   return FIELD_LABELS[trimmed] ?? fallbackHumanize(trimmed);
 }
+
+export const GUARD_RULE_DEFINITIONS: Record<
+  string,
+  { name: string; explanation: string; threshold: string }
+> = {
+  amount_over_cap: {
+    name: 'Order size cap',
+    explanation: 'Protects against oversized single orders above the quote safety limit.',
+    threshold: '> $0.00 to $2,500.00',
+  },
+  below_issuer_minimum: {
+    name: 'Issuer minimum order',
+    explanation:
+      'Blocks orders rejected by the issuer minimum ($5.00 on Ondo [40375]; no minimum on bStocks, tested live at $2.00).',
+    threshold: '$5.00 Ondo / > $0.00 bStocks ($0.01 tie-break floor)',
+  },
+  market_closed: {
+    name: 'Trading session open',
+    explanation: 'Stops trades when the issuer session is paused, closed, or in transition.',
+    threshold: 'Active trading session',
+  },
+  reference_stale: {
+    name: 'Reference price freshness',
+    explanation: 'Requires a fresh underlying stock reference price before comparing spreads.',
+    threshold: '<= 120s age',
+  },
+  quality_unreliable: {
+    name: 'Token price & ratio sanity',
+    explanation: 'Filters sub-$1.00 outlier feeds and unsupported share ratios outside 0.50-1.50x.',
+    threshold: '>= $1.00 & 0.50x-1.50x ratio',
+  },
+  depth_thin: {
+    name: 'On-chain pool depth',
+    explanation: 'Requires enough BNB Chain pool depth or 24-hour RFQ volume to fill cleanly.',
+    threshold: '>= $10K AMM depth or >= $1M 24h vol',
+  },
+  slippage_too_high: {
+    name: 'All-in slippage vs stock',
+    explanation:
+      'Refuses quotes where all-in execution price exceeds the stock reference by > 1.00%.',
+    threshold: '<= 1.00% (100 bps)',
+  },
+  unknown_ticker: {
+    name: 'Verified BSC token contract',
+    explanation:
+      'Only routes to verified Ondo Global Markets or bStocks contracts on BNB Chain.',
+    threshold: 'Verified BSC RWA catalog',
+  },
+};
+

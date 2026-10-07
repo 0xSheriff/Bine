@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchQuote, fetchTickers } from '../api'
+import { usePrefersReducedMotion } from '../components/BineLogo'
+import { GlassDetailPanel, runGlassViewTransition } from '../components/GlassStack'
 import {
   Footer,
   TopHeader,
@@ -9,14 +11,19 @@ import {
   navigateApp,
 } from '../components/shared'
 import recordedRefusals from '../data/recorded-refusals.json'
-import { humanizeCode, humanizeStatus } from '../lib/humanize'
+import { GUARD_RULE_DEFINITIONS, humanizeCode, humanizeStatus } from '../lib/humanize'
 import type { QuoteVerdictResponse } from '../types'
-import { GUARD_RULE_DEFINITIONS } from './Guard'
 
 export default function Refusals() {
+  const reducedMotion = usePrefersReducedMotion()
   const [runningId, setRunningId] = useState<string | null>(null)
   const [liveResults, setLiveResults] = useState<Record<string, QuoteVerdictResponse>>({})
   const [liveErrors, setLiveErrors] = useState<Record<string, string>>({})
+  const [openRuleCode, setOpenRuleCode] = useState<string | null>(null)
+  const [openCardId, setOpenCardId] = useState<string | null>(recordedRefusals[0]?.id ?? null)
+
+  const ruleTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const cardTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const { data: catalog } = useQuery({
     queryKey: ['tickers'],
@@ -55,6 +62,13 @@ export default function Refusals() {
   const sessionStatus = humanizeStatus(sessionSample?.market?.status || 'regular')
   const sessionOpen = sessionSample?.market?.open ?? true
 
+  const activeRule = openRuleCode ? GUARD_RULE_DEFINITIONS[openRuleCode] : null
+  const activeRuleTriggerRef = {
+    get current() {
+      return openRuleCode ? ruleTriggerRefs.current[openRuleCode] ?? null : null
+    },
+  }
+
   return (
     <div
       className="min-h-screen flex flex-col overflow-x-hidden"
@@ -71,7 +85,7 @@ export default function Refusals() {
                   Why Bine says no
                 </h1>
                 <p className="bine-body m-0" style={{ color: 'var(--text-secondary)' }}>
-                  Every trade runs through 8 deterministic pre-trade checks. Below is the rule legend and recorded refusal evidence from BNB Chain, with one-at-a-time live verification.
+                  Every trade runs through 8 deterministic pre-trade checks. Click any rule row or recorded refusal card to open its liquid-glass breakdown and run a live check.
                 </p>
               </div>
 
@@ -98,14 +112,14 @@ export default function Refusals() {
               </div>
             </div>
 
-            {/* 1. 8-Rule Legend (Code column removed per Phase A) */}
+            {/* 1. 8-Rule Legend (Code column removed per Phase A; clickable rows open GlassDetailPanel) */}
             <section aria-labelledby="rule-legend-heading" className="space-y-4">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 id="rule-legend-heading" className="text-lg font-semibold m-0">
                   The 8 pre-trade guard rules
                 </h2>
                 <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                  Evaluated in order on every GET /api/quote request
+                  Click any rule to inspect its threshold &amp; data source
                 </span>
               </div>
 
@@ -123,27 +137,78 @@ export default function Refusals() {
                         <th className="py-3 px-4 font-medium">Rule</th>
                         <th className="py-3 px-4 font-medium">What it protects</th>
                         <th className="py-3 px-4 font-medium">Threshold</th>
+                        <th className="py-3 px-4 font-medium text-right">Inspect</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.entries(GUARD_RULE_DEFINITIONS).map(([code, rule]) => (
-                        <tr
-                          key={code}
-                          style={{ borderBottom: '1px solid var(--hairline)' }}
-                        >
-                          <td className="py-3 px-4 font-medium whitespace-nowrap">{rule.name}</td>
-                          <td className="py-3 px-4" style={{ color: 'var(--text-secondary)' }}>
-                            {rule.explanation}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-xs whitespace-nowrap">
-                            {rule.threshold}
-                          </td>
-                        </tr>
-                      ))}
+                      {Object.entries(GUARD_RULE_DEFINITIONS).map(([code, rule]) => {
+                        const isRuleOpen = openRuleCode === code
+                        return (
+                          <tr
+                            key={code}
+                            style={{
+                              borderBottom: '1px solid var(--hairline)',
+                              backgroundColor: isRuleOpen ? 'var(--surface-subtle)' : 'transparent',
+                            }}
+                          >
+                            <td className="py-3 px-4 font-medium whitespace-nowrap">{rule.name}</td>
+                            <td className="py-3 px-4" style={{ color: 'var(--text-secondary)' }}>
+                              {rule.explanation}
+                            </td>
+                            <td className="py-3 px-4 font-mono text-xs whitespace-nowrap">
+                              {rule.threshold}
+                            </td>
+                            <td className="py-2 px-4 text-right whitespace-nowrap">
+                              <button
+                                ref={el => {
+                                  ruleTriggerRefs.current[code] = el
+                                }}
+                                type="button"
+                                aria-expanded={isRuleOpen}
+                                aria-controls={`rule-glass-${code}`}
+                                onClick={() =>
+                                  runGlassViewTransition(() => {
+                                    setOpenRuleCode(prev => (prev === code ? null : code))
+                                  }, reducedMotion)
+                                }
+                                className="bine-pill-secondary px-3 min-h-[44px] text-xs font-medium cursor-pointer"
+                              >
+                                {isRuleOpen ? 'Hide' : 'Details'}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
+
+              {openRuleCode && activeRule && (
+                <GlassDetailPanel
+                  id={`rule-glass-${openRuleCode}`}
+                  isOpen={true}
+                  onClose={() =>
+                    runGlassViewTransition(() => {
+                      setOpenRuleCode(null)
+                    }, reducedMotion)
+                  }
+                  title={activeRule.name}
+                  subtitle={`Threshold: ${activeRule.threshold}`}
+                  triggerRef={activeRuleTriggerRef}
+                >
+                  <p className="m-0">{activeRule.explanation}</p>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <a
+                      href="/guard"
+                      onClick={e => navigateApp('/guard', e)}
+                      className="bine-pill-primary min-h-[44px] px-5 text-xs"
+                    >
+                      Test this rule in Guard &rarr;
+                    </a>
+                  </div>
+                </GlassDetailPanel>
+              )}
             </section>
 
             {/* 2. Recorded Evidence Cards + One-at-a-Time Live Verification */}
@@ -153,7 +218,7 @@ export default function Refusals() {
                   Recorded refusal evidence
                 </h2>
                 <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Click &ldquo;Run live now&rdquo; on any card to query GET /api/quote one request at a time.
+                  Click &ldquo;Inspect glass details&rdquo; or &ldquo;Run live now&rdquo; on any card (one open at a time).
                 </span>
               </div>
 
@@ -162,12 +227,19 @@ export default function Refusals() {
                   const live = liveResults[item.id]
                   const liveErr = liveErrors[item.id]
                   const isRunningThis = runningId === item.id
+                  const isCardOpen = openCardId === item.id
                   const liveCode = live?.refusal?.code
                     ? humanizeCode(live.refusal.code)
                     : live?.verdict === 'BUY'
                       ? 'Buy'
                       : null
                   const guardHref = `/guard?ticker=${encodeURIComponent(item.ticker)}&amount=${item.amount_usd}`
+
+                  const cardTriggerRef = {
+                    get current() {
+                      return cardTriggerRefs.current[item.id] ?? null
+                    },
+                  }
 
                   return (
                     <article
@@ -201,8 +273,33 @@ export default function Refusals() {
 
                         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                           <button
+                            ref={el => {
+                              cardTriggerRefs.current[item.id] = el
+                            }}
                             type="button"
-                            onClick={() => handleRunLive(item.id, item.ticker, item.amount_usd)}
+                            aria-expanded={isCardOpen}
+                            aria-controls={`refusal-glass-${item.id}`}
+                            onClick={() =>
+                              runGlassViewTransition(() => {
+                                setOpenCardId(prev => (prev === item.id ? null : item.id))
+                              }, reducedMotion)
+                            }
+                            className="bine-pill-secondary cursor-pointer min-h-[44px]"
+                            style={{
+                              height: '44px',
+                              padding: '0 18px',
+                              fontSize: '13px',
+                            }}
+                          >
+                            {isCardOpen ? 'Hide details' : 'Inspect details'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenCardId(item.id)
+                              handleRunLive(item.id, item.ticker, item.amount_usd)
+                            }}
                             disabled={Boolean(runningId)}
                             className="bine-pill-secondary cursor-pointer disabled:opacity-50 min-h-[44px]"
                             style={{
@@ -229,51 +326,95 @@ export default function Refusals() {
                         </div>
                       </div>
 
-                      {/* Live comparison box when user clicks "Run live now" */}
-                      {(live || liveErr) && (
-                        <div
-                          className="rounded-xl p-4 space-y-2"
-                          style={{
-                            backgroundColor: 'var(--surface-subtle)',
-                            border: '1px solid var(--border)',
-                          }}
-                          aria-live="polite"
-                        >
-                          {liveErr ? (
-                            <div className="text-xs font-mono" style={{ color: 'var(--bad)' }}>
-                              Live check error: {liveErr}
+                      <GlassDetailPanel
+                        id={`refusal-glass-${item.id}`}
+                        isOpen={isCardOpen}
+                        onClose={() =>
+                          runGlassViewTransition(() => {
+                            setOpenCardId(null)
+                          }, reducedMotion)
+                        }
+                        title={`${item.ticker} (${item.token_symbol}) · ${item.rule_label}`}
+                        subtitle={`Recorded ${formatAbsoluteAndRelative(item.recorded_at)} · Issuer ${item.issuer}`}
+                        triggerRef={cardTriggerRef}
+                      >
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                            <div style={{ color: 'var(--text-secondary)' }}>Token price</div>
+                            <div className="font-semibold text-sm mt-0.5">${item.token_price_usd.toFixed(2)}</div>
+                          </div>
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                            <div style={{ color: 'var(--text-secondary)' }}>Reference / sh</div>
+                            <div className="font-semibold text-sm mt-0.5">${item.reference_price_usd.toFixed(2)}</div>
+                          </div>
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                            <div style={{ color: 'var(--text-secondary)' }}>Share ratio</div>
+                            <div className="font-semibold text-sm mt-0.5">{item.share_ratio.toFixed(4)}x</div>
+                          </div>
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                            <div style={{ color: 'var(--text-secondary)' }}>Spread / code</div>
+                            <div className="font-semibold text-sm mt-0.5">
+                              {item.spread_pct !== null
+                                ? `${item.spread_pct.toFixed(2)}%`
+                                : item.upstream_code
+                                  ? `Code ${item.upstream_code}`
+                                  : 'N/A'}
                             </div>
-                          ) : live ? (
-                            <>
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                                    Live result right now:
-                                  </span>
-                                  <span
-                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold"
-                                    style={{
-                                      backgroundColor:
-                                        live.verdict === 'BUY' ? 'var(--chip-good-bg)' : 'var(--chip-bad-bg)',
-                                      color: live.verdict === 'BUY' ? 'var(--good)' : 'var(--bad)',
-                                    }}
-                                  >
-                                    {liveCode}
+                          </div>
+                        </div>
+
+                        {item.alternative?.note && (
+                          <p className="text-xs m-0" style={{ color: 'var(--text-secondary)' }}>
+                            Alternative issuer note: {item.alternative.note}
+                          </p>
+                        )}
+
+                        {/* Live comparison box when user clicks "Run live now" */}
+                        {(live || liveErr) && (
+                          <div
+                            className="rounded-xl p-4 space-y-2"
+                            style={{
+                              backgroundColor: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                            }}
+                            aria-live="polite"
+                          >
+                            {liveErr ? (
+                              <div className="text-xs font-mono" style={{ color: 'var(--bad)' }}>
+                                Live check error: {liveErr}
+                              </div>
+                            ) : live ? (
+                              <>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                                      Live result right now:
+                                    </span>
+                                    <span
+                                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold"
+                                      style={{
+                                        backgroundColor:
+                                          live.verdict === 'BUY' ? 'var(--chip-good-bg)' : 'var(--chip-bad-bg)',
+                                        color: live.verdict === 'BUY' ? 'var(--good)' : 'var(--bad)',
+                                      }}
+                                    >
+                                      {liveCode}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                                    {humanizeStatus(live.market.status)} · {formatSecondsAgo(live.quoted_at)}
                                   </span>
                                 </div>
-                                <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                                  {humanizeStatus(live.market.status)} · {formatSecondsAgo(live.quoted_at)}
-                                </span>
-                              </div>
-                              <p className="text-sm m-0 leading-relaxed">
-                                {live.verdict === 'BUY'
-                                  ? `BUY ${live.shares?.toFixed(4) ?? '0.0000'} ${live.ticker} (${live.token?.symbol}) at $${live.all_in_price_per_share?.toFixed(2) ?? 'N/A'}/sh (${live.spread_pct?.toFixed(2) ?? '0.00'}% vs reference).`
-                                  : live.refusal?.message || 'Refused by guard.'}
-                              </p>
-                            </>
-                          ) : null}
-                        </div>
-                      )}
+                                <p className="text-sm m-0 leading-relaxed">
+                                  {live.verdict === 'BUY'
+                                    ? `BUY ${live.shares?.toFixed(4) ?? '0.0000'} ${live.ticker} (${live.token?.symbol}) at $${live.all_in_price_per_share?.toFixed(2) ?? 'N/A'}/sh (${live.spread_pct?.toFixed(2) ?? '0.00'}% vs reference).`
+                                    : live.refusal?.message || 'Refused by guard.'}
+                                </p>
+                              </>
+                            ) : null}
+                          </div>
+                        )}
+                      </GlassDetailPanel>
                     </article>
                   )
                 })}

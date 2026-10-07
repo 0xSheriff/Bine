@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { executeTrade, fetchHealth, fetchQuote, fetchTickers } from '../api'
 import { usePrefersReducedMotion } from '../components/BineLogo'
+import { GlassDetailPanel, runGlassViewTransition } from '../components/GlassStack'
 import {
   Footer,
   LiveExecutionControl,
@@ -21,7 +22,13 @@ import type {
   QuoteVerdictResponse,
   TickerItem,
 } from '../types'
-import { humanizeCode, humanizeStatus } from '../lib/humanize'
+import {
+  GUARD_RULE_DEFINITIONS,
+  humanizeCode,
+  humanizeStatus,
+} from '../lib/humanize'
+
+export { GUARD_RULE_DEFINITIONS }
 
 const MAX_QUOTE_USD = 2500.0
 
@@ -32,52 +39,6 @@ const EXAMPLE_PRESETS = [
 ] as const
 
 const QUICK_AMOUNTS = [2, 5.5, 25, 250] as const
-
-export const GUARD_RULE_DEFINITIONS: Record<
-  string,
-  { name: string; explanation: string; threshold: string }
-> = {
-  amount_over_cap: {
-    name: 'Order size cap',
-    explanation: 'Protects against oversized single orders above the quote safety limit.',
-    threshold: '> $0.00 to $2,500.00',
-  },
-  below_issuer_minimum: {
-    name: 'Issuer minimum order',
-    explanation: 'Blocks orders rejected by the issuer minimum ($5.00 on Ondo [40375]; no minimum on bStocks, tested live at $2.00).',
-    threshold: '$5.00 Ondo / > $0.00 bStocks ($0.01 tie-break floor)',
-  },
-  market_closed: {
-    name: 'Trading session open',
-    explanation: 'Stops trades when the issuer session is paused, closed, or in transition.',
-    threshold: 'Active trading session',
-  },
-  reference_stale: {
-    name: 'Reference price freshness',
-    explanation: 'Requires a fresh underlying stock reference price before comparing spreads.',
-    threshold: '<= 120s age',
-  },
-  quality_unreliable: {
-    name: 'Token price & ratio sanity',
-    explanation: 'Filters sub-$1.00 outlier feeds and unsupported share ratios outside 0.50-1.50x.',
-    threshold: '>= $1.00 & 0.50x-1.50x ratio',
-  },
-  depth_thin: {
-    name: 'On-chain pool depth',
-    explanation: 'Requires enough BNB Chain pool depth or 24-hour RFQ volume to fill cleanly.',
-    threshold: '>= $10K AMM depth or >= $1M 24h vol',
-  },
-  slippage_too_high: {
-    name: 'All-in slippage vs stock',
-    explanation: 'Refuses quotes where all-in execution price exceeds the stock reference by > 1.00%.',
-    threshold: '<= 1.00% (100 bps)',
-  },
-  unknown_ticker: {
-    name: 'Verified BSC token contract',
-    explanation: 'Only routes to verified Ondo Global Markets or bStocks contracts on BNB Chain.',
-    threshold: 'Verified BSC RWA catalog',
-  },
-}
 
 function formatBuySentence(q: QuoteVerdictResponse): string {
   const shares = q.shares !== null ? q.shares.toFixed(4) : '0.0000'
@@ -212,6 +173,10 @@ export default function Guard() {
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
   const [copiedCurl, setCopiedCurl] = useState<boolean>(false)
   const [dryRunReceipt, setDryRunReceipt] = useState<ExecuteTradeResponse | null>(null)
+  const [openMetricId, setOpenMetricId] = useState<string | null>('shares')
+  const [openCheckCode, setOpenCheckCode] = useState<string | null>(null)
+  const metricTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const checkTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const reducedMotion = usePrefersReducedMotion()
   const queryClient = useQueryClient()
@@ -960,74 +925,123 @@ DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend -
                       )}
                     </div>
 
-                    {/* 5-Metric Grid mapped to existing API fields */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                      <div
-                        className="p-3.5 rounded-2xl space-y-1"
-                        style={{ backgroundColor: 'var(--surface-subtle)' }}
-                      >
-                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          You receive
-                        </div>
-                        <div className="font-mono font-semibold text-sm" style={{ color: 'var(--text)' }}>
-                          {quote.shares !== null ? `${quote.shares.toFixed(4)} sh` : 'N/A'}
-                        </div>
-                      </div>
+                    {/* 5-Metric Grid mapped to existing API fields (clickable GlassStack triggers) */}
+                    {(() => {
+                      const metricItems = [
+                        {
+                          id: 'shares',
+                          label: 'You receive',
+                          value: quote.shares !== null ? `${quote.shares.toFixed(4)} sh` : 'N/A',
+                          title: 'Share-adjusted output calculation',
+                          subtitle: `${quote.token?.symbol ?? quote.ticker} · Share ratio ${(selectedRow?.token_to_share_ratio ?? 1).toFixed(4)}x`,
+                          detail: `Raw tokens received (${selectedRow?.tokens_received?.toFixed(6) ?? quote.shares?.toFixed(6) ?? '0'}) divided by the catalog share ratio (${(selectedRow?.token_to_share_ratio ?? 1).toFixed(4)}x) = ${quote.shares?.toFixed(6) ?? '0'} underlying ${quote.ticker} shares.`,
+                        },
+                        {
+                          id: 'price',
+                          label: 'Price per share',
+                          value:
+                            quote.all_in_price_per_share !== null
+                              ? `$${quote.all_in_price_per_share.toFixed(2)}`
+                              : 'N/A',
+                          title: 'All-in execution price per share',
+                          subtitle: `Order size $${quote.amount_usd.toFixed(2)} USD / ${quote.shares?.toFixed(6) ?? 'N/A'} shares`,
+                          detail: `Computed as $${quote.amount_usd.toFixed(2)} USD divided by ${quote.shares?.toFixed(6) ?? '0'} share-adjusted units ($${quote.all_in_price_per_share?.toFixed(2) ?? 'N/A'}/sh), compared against the $${quote.reference_price_per_share?.toFixed(2) ?? 'N/A'}/sh stock reference price.`,
+                        },
+                        {
+                          id: 'spread',
+                          label: 'Versus market price',
+                          value:
+                            quote.spread_pct !== null
+                              ? `${quote.spread_pct > 0 ? '+' : ''}${quote.spread_pct.toFixed(2)}%`
+                              : 'N/A',
+                          title: 'Spread versus stock reference price',
+                          subtitle: 'Guard threshold: <= +1.00% (100 bps)',
+                          detail: `All-in share price ($${quote.all_in_price_per_share?.toFixed(2) ?? 'N/A'}) vs underlying stock reference ($${quote.reference_price_per_share?.toFixed(2) ?? 'N/A'}). Bine refuses any quote where the spread exceeds +1.00%.`,
+                        },
+                        {
+                          id: 'impact',
+                          label: 'Price impact',
+                          value:
+                            selectedRow?.slippage_pct !== null && selectedRow?.slippage_pct !== undefined
+                              ? `${selectedRow.slippage_pct.toFixed(2)}%`
+                              : '0.00%',
+                          title: 'DEX aggregator price impact',
+                          subtitle: `Route: ${selectedRow?.route || 'BNB Chain DEX aggregator'}`,
+                          detail: `Estimated pool price impact reported by the BNB Chain aggregator for a $${quote.amount_usd.toFixed(2)} USDT swap into ${quote.token?.symbol ?? quote.ticker}.`,
+                        },
+                        {
+                          id: 'depth',
+                          label: 'Pool depth',
+                          value: formatCompactUsd(selectedRow?.depth_usd),
+                          title: 'On-chain liquidity depth',
+                          subtitle: 'Guard threshold: >= $10K AMM depth or >= $1M 24h volume',
+                          detail: `Measured liquidity for ${quote.token?.symbol ?? quote.ticker} on BNB Smart Chain: ${formatCompactUsd(selectedRow?.depth_usd)} (${humanizeStatus(selectedRow?.depth_source || 'amm_pools')}).`,
+                        },
+                      ]
+                      const activeMetric = metricItems.find(m => m.id === openMetricId) ?? null
+                      const activeMetricTriggerRef = {
+                        get current() {
+                          return openMetricId ? metricTriggerRefs.current[openMetricId] ?? null : null
+                        },
+                      }
 
-                      <div
-                        className="p-3.5 rounded-2xl space-y-1"
-                        style={{ backgroundColor: 'var(--surface-subtle)' }}
-                      >
-                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          Price per share
-                        </div>
-                        <div className="font-mono font-semibold text-sm" style={{ color: 'var(--text)' }}>
-                          {quote.all_in_price_per_share !== null
-                            ? `$${quote.all_in_price_per_share.toFixed(2)}`
-                            : 'N/A'}
-                        </div>
-                      </div>
+                      return (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {metricItems.map((m, idx) => {
+                              const isOpen = openMetricId === m.id
+                              return (
+                                <button
+                                  key={m.id}
+                                  ref={el => {
+                                    metricTriggerRefs.current[m.id] = el
+                                  }}
+                                  type="button"
+                                  aria-expanded={isOpen}
+                                  aria-controls={`guard-metric-glass-${m.id}`}
+                                  onClick={() =>
+                                    runGlassViewTransition(() => {
+                                      setOpenMetricId(prev => (prev === m.id ? null : m.id))
+                                    }, reducedMotion)
+                                  }
+                                  className={`p-3.5 rounded-2xl space-y-1 text-left cursor-pointer min-h-[44px] bine-glass-trigger ${
+                                    idx === 4 ? 'col-span-2 sm:col-span-1' : ''
+                                  } ${isOpen ? 'bine-glass-trigger-active' : ''}`}
+                                  style={{ backgroundColor: 'var(--surface-subtle)' }}
+                                >
+                                  <div className="text-xs flex items-center justify-between gap-1" style={{ color: 'var(--text-secondary)' }}>
+                                    <span>{m.label}</span>
+                                    <span aria-hidden="true" className="font-mono text-[11px]">
+                                      {isOpen ? '−' : '+'}
+                                    </span>
+                                  </div>
+                                  <div className="font-mono font-semibold text-sm" style={{ color: 'var(--text)' }}>
+                                    {m.value}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
 
-                      <div
-                        className="p-3.5 rounded-2xl space-y-1"
-                        style={{ backgroundColor: 'var(--surface-subtle)' }}
-                      >
-                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          Versus market price
+                          {activeMetric && (
+                            <GlassDetailPanel
+                              id={`guard-metric-glass-${activeMetric.id}`}
+                              isOpen={true}
+                              onClose={() =>
+                                runGlassViewTransition(() => {
+                                  setOpenMetricId(null)
+                                }, reducedMotion)
+                              }
+                              title={activeMetric.title}
+                              subtitle={activeMetric.subtitle}
+                              triggerRef={activeMetricTriggerRef}
+                            >
+                              <p className="m-0">{activeMetric.detail}</p>
+                            </GlassDetailPanel>
+                          )}
                         </div>
-                        <div className="font-mono font-semibold text-sm" style={{ color: 'var(--text)' }}>
-                          {quote.spread_pct !== null
-                            ? `${quote.spread_pct > 0 ? '+' : ''}${quote.spread_pct.toFixed(2)}%`
-                            : 'N/A'}
-                        </div>
-                      </div>
-
-                      <div
-                        className="p-3.5 rounded-2xl space-y-1"
-                        style={{ backgroundColor: 'var(--surface-subtle)' }}
-                      >
-                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          Price impact
-                        </div>
-                        <div className="font-mono font-semibold text-sm" style={{ color: 'var(--text)' }}>
-                          {selectedRow?.slippage_pct !== null && selectedRow?.slippage_pct !== undefined
-                            ? `${selectedRow.slippage_pct.toFixed(2)}%`
-                            : '0.00%'}
-                        </div>
-                      </div>
-
-                      <div
-                        className="p-3.5 rounded-2xl space-y-1 col-span-2 sm:col-span-1"
-                        style={{ backgroundColor: 'var(--surface-subtle)' }}
-                      >
-                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          Pool depth
-                        </div>
-                        <div className="font-mono font-semibold text-sm" style={{ color: 'var(--text)' }}>
-                          {formatCompactUsd(selectedRow?.depth_usd)}
-                        </div>
-                      </div>
-                    </div>
+                      )
+                    })()}
 
                     {/* Primary Actions: Preview trade (dry-run) + Copy as curl */}
                     <div className="flex flex-wrap items-center gap-3">
@@ -1130,45 +1144,91 @@ DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend -
                       </div>
                     )}
 
-                    {/* Guard Checks List (Pass/Fail per rule) */}
+                    {/* Guard Checks List (Pass/Fail per rule, clickable to open GlassDetailPanel) */}
                     <div className="space-y-2.5 pt-1">
-                      <h3 className="text-sm font-semibold m-0" style={{ color: 'var(--text)' }}>
-                        Guard checks ({guardChecks.filter(c => c.passed).length}/{guardChecks.length} passed)
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {guardChecks.map(chk => (
-                          <div
-                            key={chk.code}
-                            className="flex items-start gap-2.5 p-3 rounded-xl text-xs"
-                            style={{ backgroundColor: 'var(--surface-subtle)' }}
-                          >
-                            <span
-                              className="inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0 font-bold mt-0.5"
-                              style={{
-                                backgroundColor: chk.passed
-                                  ? 'var(--chip-good-bg)'
-                                  : 'var(--chip-bad-bg)',
-                                color: chk.passed ? 'var(--good)' : 'var(--bad)',
-                              }}
-                              aria-hidden="true"
-                            >
-                              {chk.passed ? '✓' : '✕'}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="font-semibold" style={{ color: 'var(--text)' }}>
-                                {chk.name}
-                              </div>
-                              <div
-                                className="truncate"
-                                title={chk.detail}
-                                style={{ color: 'var(--text-secondary)' }}
-                              >
-                                {chk.detail}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold m-0" style={{ color: 'var(--text)' }}>
+                          Guard checks ({guardChecks.filter(c => c.passed).length}/{guardChecks.length} passed)
+                        </h3>
+                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          Click any check to inspect rule threshold
+                        </span>
                       </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {guardChecks.map(chk => {
+                          const isOpen = openCheckCode === chk.code
+                          return (
+                            <button
+                              key={chk.code}
+                              ref={el => {
+                                checkTriggerRefs.current[chk.code] = el
+                              }}
+                              type="button"
+                              aria-expanded={isOpen}
+                              aria-controls={`guard-check-glass-${chk.code}`}
+                              onClick={() =>
+                                runGlassViewTransition(() => {
+                                  setOpenCheckCode(prev => (prev === chk.code ? null : chk.code))
+                                }, reducedMotion)
+                              }
+                              className={`flex items-start gap-2.5 p-3 rounded-xl text-xs text-left cursor-pointer min-h-[44px] bine-glass-trigger ${
+                                isOpen ? 'bine-glass-trigger-active' : ''
+                              }`}
+                              style={{ backgroundColor: 'var(--surface-subtle)' }}
+                            >
+                              <span
+                                className="inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0 font-bold mt-0.5"
+                                style={{
+                                  backgroundColor: chk.passed
+                                    ? 'var(--chip-good-bg)'
+                                    : 'var(--chip-bad-bg)',
+                                  color: chk.passed ? 'var(--good)' : 'var(--bad)',
+                                }}
+                                aria-hidden="true"
+                              >
+                                {chk.passed ? '✓' : '✕'}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold" style={{ color: 'var(--text)' }}>
+                                  {chk.name}
+                                </div>
+                                <div
+                                  className="truncate"
+                                  title={chk.detail}
+                                  style={{ color: 'var(--text-secondary)' }}
+                                >
+                                  {chk.detail}
+                                </div>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {openCheckCode && GUARD_RULE_DEFINITIONS[openCheckCode] && (
+                        <GlassDetailPanel
+                          id={`guard-check-glass-${openCheckCode}`}
+                          isOpen={true}
+                          onClose={() =>
+                            runGlassViewTransition(() => {
+                              setOpenCheckCode(null)
+                            }, reducedMotion)
+                          }
+                          title={GUARD_RULE_DEFINITIONS[openCheckCode].name}
+                          subtitle={`Rule threshold: ${GUARD_RULE_DEFINITIONS[openCheckCode].threshold}`}
+                          triggerRef={{
+                            get current() {
+                              return openCheckCode ? checkTriggerRefs.current[openCheckCode] ?? null : null
+                            },
+                          }}
+                        >
+                          <p className="m-0">{GUARD_RULE_DEFINITIONS[openCheckCode].explanation}</p>
+                          <p className="m-0 text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                            Current quote evaluation:{' '}
+                            {guardChecks.find(c => c.code === openCheckCode)?.detail}
+                          </p>
+                        </GlassDetailPanel>
+                      )}
                     </div>
 
                     {/* Technical Route Details Disclosure */}

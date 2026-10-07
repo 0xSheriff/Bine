@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { executeTrade, fetchDecisions, fetchHealth } from '../api'
 import type { ExecuteTradeResponse, QuoteVerdictResponse } from '../types'
 import { BineWordmarkLockup } from './BineLogo'
+import { BineGlassFilterDef } from './GlassStack'
 import { humanizeStatus } from '../lib/humanize'
 
 export function parseUtcDate(iso: string): Date {
@@ -236,6 +237,7 @@ export function TopHeader() {
         borderBottom: scrolled ? '1px solid var(--hairline)' : '1px solid transparent',
       }}
     >
+      <BineGlassFilterDef />
       <div className="bine-container py-2 sm:py-0">
         <div className="w-full max-w-[1240px] mx-auto flex flex-wrap sm:flex-nowrap items-center justify-between gap-y-2 gap-x-4">
           <div className="flex items-center gap-4 md:gap-8 min-w-0">

@@ -12,6 +12,8 @@ import { usePrefersReducedMotion } from '../components/BineLogo'
 import { HeroArt } from '../components/HeroArt'
 import {
   Footer,
+  LiveExecutionControl,
+  LiveModeChip,
   TopHeader,
   formatCompactUsd,
   formatSecondsAgo,
@@ -202,8 +204,8 @@ export default function Home() {
                   transition={{ duration: 0.72, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <a
-                    href="#guard"
-                    onClick={e => navigateApp('/#guard', e)}
+                    href="/guard"
+                    onClick={e => navigateApp('/guard', e)}
                     className="bine-pill-primary"
                     style={{
                       height: '54px',
@@ -430,11 +432,9 @@ export default function Home() {
                                   ? `Buy $${quote.amount_usd.toFixed(2)} safely`
                                   : 'Preview trade (dry-run)'}
                             </button>
-                            {!liveModeOn && (
-                              <p className="text-sm m-0" style={{ color: 'var(--text-secondary)' }}>
-                                Live trading is off on this server.
-                              </p>
-                            )}
+                            <div className="pt-1">
+                              <LiveModeChip />
+                            </div>
                           </div>
                         ) : (
                           receipt && (
@@ -496,7 +496,7 @@ export default function Home() {
                                       disabled={confirmLiveMutation.isPending}
                                       className="bine-pill-primary disabled:opacity-60"
                                       style={{
-                                        height: '42px',
+                                        height: '44px',
                                         padding: '0 24px',
                                       }}
                                     >
@@ -513,7 +513,7 @@ export default function Home() {
                                   }}
                                   className="bine-pill-secondary"
                                   style={{
-                                    height: '42px',
+                                    height: '44px',
                                     padding: '0 22px',
                                   }}
                                 >
@@ -522,6 +522,8 @@ export default function Home() {
                                     : 'Close'}
                                 </button>
                               </div>
+                              <LiveExecutionControl quote={quote} dryRunResult={receipt} />
+                              <LiveModeChip />
                             </div>
                           )
                         )}

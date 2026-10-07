@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { LiquidMetal } from '@paper-design/shaders-react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import bineMarkPng from '../assets/bine-mark.png'
+
+const LazyLiquidMetal = lazy(() =>
+  import('@paper-design/shaders-react').then(m => ({ default: m.LiquidMetal })),
+)
 
 let cachedWebGlAvailable: boolean | null = null
 
@@ -96,29 +99,30 @@ export function BineLogoTile({ size = 36, staticOnly = false }: BineLogoTileProp
           maskRepeat: 'no-repeat',
           WebkitMaskPosition: 'center',
           maskPosition: 'center',
-          opacity: useShader ? 0 : 1,
         }}
       />
 
       {useShader && (
         <div className="absolute inset-0">
-          <LiquidMetal
-            image={bineMarkPng}
-            colorBack="#000000"
-            colorTint="#ffffff"
-            repetition={1.75}
-            softness={0.12}
-            shiftRed={0.44}
-            shiftBlue={0.44}
-            distortion={0.14}
-            contour={0.58}
-            angle={64}
-            scale={0.78}
-            fit="contain"
-            speed={shaderSpeed}
-            minPixelRatio={2}
-            style={{ width: '100%', height: '100%', display: 'block' }}
-          />
+          <Suspense fallback={null}>
+            <LazyLiquidMetal
+              image={bineMarkPng}
+              colorBack="#000000"
+              colorTint="#ffffff"
+              repetition={1.75}
+              softness={0.12}
+              shiftRed={0.44}
+              shiftBlue={0.44}
+              distortion={0.14}
+              contour={0.58}
+              angle={64}
+              scale={0.78}
+              fit="contain"
+              speed={shaderSpeed}
+              minPixelRatio={2}
+              style={{ width: '100%', height: '100%', display: 'block' }}
+            />
+          </Suspense>
         </div>
       )}
     </div>

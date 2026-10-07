@@ -1,6 +1,9 @@
-/** Shared formatting helpers, TopHeader, Footer, and inlined Simple Icons for Bine. */
+/** Shared formatting helpers, TopHeader, Footer, LiveModeChip, and inlined Simple Icons for Bine. */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { executeTrade, fetchDecisions, fetchHealth } from '../api'
+import type { ExecuteTradeResponse, QuoteVerdictResponse } from '../types'
 import { BineWordmarkLockup } from './BineLogo'
 
 export function parseUtcDate(iso: string): Date {
@@ -8,12 +11,44 @@ export function parseUtcDate(iso: string): Date {
   return new Date(normalized)
 }
 
-export function formatSecondsAgo(iso: string | null | undefined): string {
+export function getSecondsElapsed(iso: string | null | undefined, nowMs = Date.now()): number {
+  if (!iso) return 0
+  const parsed = parseUtcDate(iso).getTime()
+  if (Number.isNaN(parsed)) return 0
+  return Math.max(0, Math.round((nowMs - parsed) / 1000))
+}
+
+export function formatSecondsAgo(iso: string | null | undefined, nowMs = Date.now()): string {
   if (!iso) return 'just now'
-  const sec = Math.max(0, Math.round((Date.now() - parseUtcDate(iso).getTime()) / 1000))
+  const sec = getSecondsElapsed(iso, nowMs)
   if (sec < 60) return `${sec}s ago`
-  const min = Math.round(sec / 60)
-  return `${min}m ago`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m ago`
+  const hours = Math.floor(min / 60)
+  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? '1 day ago' : `${days} days ago`
+}
+
+export function formatAbsoluteAndRelative(iso: string | null | undefined, nowMs = Date.now()): string {
+  if (!iso) return 'N/A'
+  const date = parseUtcDate(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  // Format in Africa/Lagos (WAT, UTC+1) to match user local timezone consistently
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Lagos',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const month = parts.find(p => p.type === 'month')?.value ?? ''
+  const day = parts.find(p => p.type === 'day')?.value ?? ''
+  const hour = parts.find(p => p.type === 'hour')?.value ?? '00'
+  const minute = parts.find(p => p.type === 'minute')?.value ?? '00'
+  const rel = formatSecondsAgo(iso, nowMs)
+  return `${month} ${day}, ${hour}:${minute} WAT, ${rel}`
 }
 
 export function formatCompactUsd(val: number | null | undefined): string {
@@ -28,6 +63,23 @@ export function shortAddress(addr: string | null | undefined): string {
   if (!addr) return 'N/A'
   if (addr.length <= 12) return addr
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+}
+
+export const SIM_ROUTER_TOOLTIP =
+  'The dry-run simulates against router 0xB444.... Live swaps through baw use router 0xb300.... See README.'
+
+export function formatSimulationStatus(status: string | null | undefined): {
+  label: string
+  tooltip?: string
+} {
+  if (!status) return { label: 'N/A' }
+  if (status === 'REQUIRES_APPROVAL') {
+    return {
+      label: 'Sim router needs allowance',
+      tooltip: SIM_ROUTER_TOOLTIP,
+    }
+  }
+  return { label: status }
 }
 
 /** Inlined from simple-icons/icons/github.svg */
@@ -64,11 +116,30 @@ export function XIcon({ size = 22 }: { size?: number }) {
   )
 }
 
+export function focusPageHeading() {
+  if (typeof window === 'undefined') return
+  window.setTimeout(() => {
+    const h1 = document.querySelector('main h1, h1') as HTMLElement | null
+    if (h1) {
+      if (!h1.hasAttribute('tabindex')) {
+        h1.setAttribute('tabindex', '-1')
+      }
+      h1.focus({ preventScroll: true })
+    }
+  }, 60)
+}
+
 export function navigateApp(href: string, e?: React.MouseEvent<HTMLAnchorElement>) {
   if (typeof window === 'undefined') return
   if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) return
 
   const url = new URL(href, window.location.origin)
+  // Redirect /#guard to /guard
+  if (url.pathname === '/' && url.hash === '#guard') {
+    url.pathname = '/guard'
+    url.hash = ''
+  }
+
   const samePath = url.pathname === window.location.pathname && url.search === window.location.search
 
   if (e) e.preventDefault()
@@ -76,26 +147,30 @@ export function navigateApp(href: string, e?: React.MouseEvent<HTMLAnchorElement
   if (!samePath) {
     window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`)
     window.dispatchEvent(new PopStateEvent('popstate'))
-  }
-
-  if (url.hash) {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+    focusPageHeading()
+  } else if (url.hash) {
     const id = url.hash.slice(1)
     window.setTimeout(() => {
       const target = document.getElementById(id)
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }
-    }, samePath ? 0 : 60)
-  } else if (!samePath) {
-    window.scrollTo({ top: 0, behavior: 'auto' })
+    }, 0)
   }
 }
 
 export function TopHeader() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-      const qTheme = new URLSearchParams(window.location.search).get('theme')
-      if (qTheme === 'dark' || qTheme === 'light') return qTheme
+      try {
+        const qTheme = new URLSearchParams(window.location.search).get('theme')
+        if (qTheme === 'dark' || qTheme === 'light') return qTheme
+        const stored = localStorage.getItem('bine-theme')
+        if (stored === 'dark' || stored === 'light') return stored
+      } catch {
+        // ignore storage error
+      }
       const current = document.documentElement.getAttribute('data-theme')
       if (current === 'dark' || current === 'light') return current
     }
@@ -126,10 +201,10 @@ export function TopHeader() {
 
   const pathname = typeof window !== 'undefined' ? window.location.pathname : '/'
   const navItems = [
-    { href: '/#guard', matchPath: '/', label: 'Guard' },
-    { href: '/integrate', matchPath: '/integrate', label: 'Integrate' },
+    { href: '/guard', matchPath: '/guard', label: 'Guard' },
     { href: '/refusals', matchPath: '/refusals', label: 'Refusals' },
     { href: '/receipts', matchPath: '/receipts', label: 'Receipts' },
+    { href: '/integrate', matchPath: '/integrate', label: 'Developers' },
   ]
 
   return (
@@ -142,20 +217,20 @@ export function TopHeader() {
         borderBottom: scrolled ? '1px solid var(--hairline)' : '1px solid transparent',
       }}
     >
-      <div className="bine-container py-2.5 sm:py-0">
+      <div className="bine-container py-2 sm:py-0">
         <div className="w-full max-w-[1240px] mx-auto flex flex-wrap sm:flex-nowrap items-center justify-between gap-y-2 gap-x-4">
-          <div className="flex items-center gap-4 md:gap-9 min-w-0">
+          <div className="flex items-center gap-4 md:gap-8 min-w-0">
             <a
               href="/"
               onClick={e => navigateApp('/', e)}
-              className="no-underline shrink-0 inline-flex items-center rounded-lg"
+              className="no-underline shrink-0 inline-flex items-center min-h-[44px] px-1 rounded-lg"
               aria-label="Bine home"
             >
               <BineWordmarkLockup tileSize={36} />
             </a>
 
             <nav
-              className="hidden sm:flex items-center gap-4 md:gap-7"
+              className="hidden sm:flex items-center gap-2 md:gap-5"
               aria-label="Main navigation"
             >
               {navItems.map(item => {
@@ -166,7 +241,7 @@ export function TopHeader() {
                     href={item.href}
                     onClick={e => navigateApp(item.href, e)}
                     aria-current={active ? 'page' : undefined}
-                    className="no-underline py-1 rounded-md shrink-0 transition-colors"
+                    className="no-underline inline-flex items-center min-h-[44px] px-2.5 rounded-lg shrink-0 transition-colors"
                     style={{
                       fontSize: '14px',
                       fontWeight: active ? 600 : 500,
@@ -186,7 +261,7 @@ export function TopHeader() {
               onClick={() => setTheme(prev => (prev === 'light' ? 'dark' : 'light'))}
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              className="w-10 h-10 inline-flex items-center justify-center rounded-full cursor-pointer shrink-0 transition-transform hover:-translate-y-0.5 active:scale-95"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-full cursor-pointer shrink-0 transition-transform hover:-translate-y-0.5 active:scale-95"
               style={{
                 backgroundColor: 'var(--pill-secondary-bg)',
                 color: 'var(--text)',
@@ -207,11 +282,11 @@ export function TopHeader() {
             </button>
 
             <a
-              href="/#guard"
-              onClick={e => navigateApp('/#guard', e)}
+              href="/guard"
+              onClick={e => navigateApp('/guard', e)}
               className="bine-pill-primary"
               style={{
-                height: '40px',
+                minHeight: '44px',
                 padding: '0 20px',
               }}
             >
@@ -219,7 +294,7 @@ export function TopHeader() {
             </a>
           </div>
 
-          {/* Mobile navigation row (<640px) so all 4 routes and "Check a trade" fit without horizontal scroll */}
+          {/* Mobile navigation row (<640px) with >= 44px tap targets */}
           <nav
             className="flex sm:hidden items-center justify-between w-full pt-1 border-t"
             style={{ borderColor: 'var(--hairline)' }}
@@ -233,7 +308,7 @@ export function TopHeader() {
                   href={item.href}
                   onClick={e => navigateApp(item.href, e)}
                   aria-current={active ? 'page' : undefined}
-                  className="no-underline py-1 px-1 rounded-md transition-colors"
+                  className="no-underline inline-flex items-center justify-center min-h-[44px] px-2 rounded-md transition-colors"
                   style={{
                     fontSize: '14px',
                     fontWeight: active ? 600 : 500,
@@ -248,6 +323,313 @@ export function TopHeader() {
         </div>
       </div>
     </header>
+  )
+}
+
+export function LiveModeChip() {
+  const [open, setOpen] = useState(false)
+  const popoverId = useId()
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+
+  const healthQuery = useQuery({
+    queryKey: ['health'],
+    queryFn: fetchHealth,
+    staleTime: 30_000,
+  })
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    const onPointerDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('mousedown', onPointerDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [open])
+
+  const liveMode = healthQuery.data?.live_mode ?? false
+  const maxTrade = healthQuery.data?.max_trade_usd ?? 6
+  const dailyCap = healthQuery.data?.daily_cap_usd ?? 10
+
+  if (liveMode) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium"
+        style={{
+          backgroundColor: 'var(--chip-warn-bg)',
+          color: 'var(--warn)',
+        }}
+      >
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--warn)' }} />
+        <span>
+          Live mode on, caps ${maxTrade} / ${dailyCap}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={wrapRef} className="relative inline-flex flex-wrap items-center gap-2">
+      <div
+        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs leading-relaxed"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ backgroundColor: 'var(--good)' }}
+          aria-hidden="true"
+        />
+        <span>
+          Dry-run mode. Bine simulates every trade with the Transaction API and never signs one from this page.
+        </span>
+      </div>
+
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={popoverId}
+        onClick={() => setOpen(prev => !prev)}
+        className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-full text-xs font-semibold cursor-pointer"
+        style={{
+          backgroundColor: 'var(--surface-subtle)',
+          color: 'var(--text)',
+          border: '1px solid var(--hairline)',
+        }}
+      >
+        Why dry-run?
+      </button>
+
+      {open && (
+        <div
+          id={popoverId}
+          role="region"
+          aria-label="Live execution policy"
+          className="w-full sm:max-w-[440px] mt-1 p-3.5 rounded-2xl text-xs leading-relaxed"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--hairline)',
+            boxShadow: 'var(--card-shadow)',
+          }}
+        >
+          Live swaps run from the CLI with your own Agentic Wallet, capped at ${maxTrade} per trade and $
+          {dailyCap} per day, so a hosted copy of Bine can never spend anyone&apos;s funds.
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface LiveExecutionControlProps {
+  quote: QuoteVerdictResponse
+  dryRunResult: ExecuteTradeResponse | null
+  onTradeComplete?: (res: ExecuteTradeResponse) => void
+}
+
+export function LiveExecutionControl({
+  quote,
+  dryRunResult,
+  onTradeComplete,
+}: LiveExecutionControlProps) {
+  const healthQuery = useQuery({
+    queryKey: ['health'],
+    queryFn: fetchHealth,
+    staleTime: 30_000,
+  })
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [adminToken, setAdminToken] = useState('')
+  const [stage, setStage] = useState<'idle' | 'submitted' | 'polling' | 'filled' | 'failed'>('idle')
+  const [liveResult, setLiveResult] = useState<ExecuteTradeResponse | null>(null)
+  const [liveError, setLiveError] = useState<string | null>(null)
+
+  const liveMode = healthQuery.data?.live_mode ?? false
+  const maxTrade = healthQuery.data?.max_trade_usd ?? 6
+  const dailyCap = healthQuery.data?.daily_cap_usd ?? 10
+
+  if (!liveMode || quote.verdict !== 'BUY' || !dryRunResult?.simulation?.passed) {
+    return null
+  }
+
+  const issuerLabel = quote.token?.issuer === 'bstock' ? 'bStocks' : 'Ondo Global Markets'
+
+  const handleConfirmSwap = async () => {
+    setStage('submitted')
+    setLiveError(null)
+    try {
+      const pollTimer = window.setTimeout(() => setStage('polling'), 900)
+      const res = await executeTrade(
+        quote.ticker,
+        quote.amount_usd,
+        true,
+        adminToken.trim() || undefined,
+      )
+      window.clearTimeout(pollTimer)
+      setLiveResult(res)
+      if (res.execution.status === 'LIVE_SUBMITTED' && res.execution.tx_hash) {
+        setStage('filled')
+      } else {
+        setStage('failed')
+        setLiveError(res.execution.detail || 'Live execution did not return a confirmed tx_hash.')
+      }
+      await fetchDecisions(5)
+      onTradeComplete?.(res)
+    } catch (err) {
+      setStage('failed')
+      setLiveError(err instanceof Error ? err.message : 'Live execution failed')
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-3">
+      {!dialogOpen && stage === 'idle' && (
+        <button
+          type="button"
+          onClick={() => setDialogOpen(true)}
+          className="bine-pill-secondary px-5 min-h-[44px]"
+        >
+          Review live swap (${quote.amount_usd.toFixed(2)})
+        </button>
+      )}
+
+      {dialogOpen && (
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-label="Confirm live swap"
+          className="p-5 rounded-2xl space-y-4"
+          style={{
+            backgroundColor: 'var(--surface-subtle)',
+            border: '1px solid var(--hairline)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold m-0" style={{ color: 'var(--text)' }}>
+              Review live swap before signing
+            </h3>
+            <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+              Wallet 0x34dA...b730
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <div style={{ color: 'var(--text-secondary)' }}>Amount</div>
+              <div className="font-mono font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
+                ${quote.amount_usd.toFixed(2)} USDT
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-secondary)' }}>Token</div>
+              <div className="font-mono font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
+                {quote.token?.symbol} ({issuerLabel})
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-secondary)' }}>Route</div>
+              <div className="font-mono font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
+                baw (0xb300...028d)
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-secondary)' }}>Safety caps</div>
+              <div className="font-mono font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
+                ${maxTrade} trade / ${dailyCap} day
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="live-admin-token"
+              className="block text-xs font-medium mb-1"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Local admin token (optional if not configured)
+            </label>
+            <input
+              id="live-admin-token"
+              type="password"
+              value={adminToken}
+              onChange={e => setAdminToken(e.target.value)}
+              placeholder="X-Bine-Admin-Token"
+              className="w-full h-11 px-3 rounded-xl text-xs font-mono border-0"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                color: 'var(--text)',
+              }}
+            />
+          </div>
+
+          {stage !== 'idle' && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="p-3 rounded-xl text-xs space-y-1"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                color: stage === 'failed' ? 'var(--bad)' : 'var(--text)',
+              }}
+            >
+              <div className="font-semibold">
+                {stage === 'submitted' && '1/3 Submitted to Binance Agentic Wallet...'}
+                {stage === 'polling' && '2/3 Polling BSC mainnet receipt...'}
+                {stage === 'filled' && '3/3 Swap filled and verified on BNB Chain.'}
+                {stage === 'failed' && 'Swap stopped before fill.'}
+              </div>
+              {liveResult?.execution?.tx_hash && (
+                <div className="font-mono">
+                  tx: {shortAddress(liveResult.execution.tx_hash)}{' '}
+                  {liveResult.execution.bsctrace_url && (
+                    <a
+                      href={liveResult.execution.bsctrace_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline ml-2"
+                      style={{ color: 'var(--text)' }}
+                    >
+                      Open BscTrace
+                    </a>
+                  )}
+                </div>
+              )}
+              {liveError && <div>{liveError}</div>}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={stage === 'submitted' || stage === 'polling'}
+              onClick={handleConfirmSwap}
+              className="bine-pill-primary px-5 min-h-[44px] disabled:opacity-50"
+            >
+              Confirm swap
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDialogOpen(false)
+                setStage('idle')
+              }}
+              className="bine-pill-secondary px-4 min-h-[44px]"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -281,7 +663,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="GitHub profile"
-                className="group inline-flex items-center gap-3 no-underline rounded-full pr-3 py-0.5 transition-transform"
+                className="group inline-flex items-center gap-3 no-underline rounded-full pr-3 min-h-[44px] py-0.5 transition-transform"
                 style={{ color: 'var(--text)' }}
               >
                 <span
@@ -304,7 +686,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="X profile"
-                className="group inline-flex items-center gap-3 no-underline rounded-full pr-3 py-0.5 transition-transform"
+                className="group inline-flex items-center gap-3 no-underline rounded-full pr-3 min-h-[44px] py-0.5 transition-transform"
                 style={{ color: 'var(--text)' }}
               >
                 <span

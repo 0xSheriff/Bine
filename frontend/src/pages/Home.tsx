@@ -76,7 +76,7 @@ export default function Home() {
           </div>
 
           <div className="bine-container relative z-10 w-full">
-            <div className="w-full max-w-[1120px] mx-auto">
+            <div className="w-full max-w-[1240px] mx-auto">
               <div className="max-w-[680px]">
                 <h1 tabIndex={-1} className="bine-hero-headline m-0 outline-none">
                   <motion.span
@@ -149,7 +149,7 @@ export default function Home() {
         {/* 2. PROOF STRIP */}
         <motion.section {...sectionReveal} className="py-6 sm:py-8">
           <div className="bine-container">
-            <div className="w-full max-w-[1120px] mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="w-full max-w-[1240px] mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4">
               <a
                 href="/guard"
                 onClick={e => navigateApp('/guard', e)}
@@ -219,7 +219,7 @@ export default function Home() {
         {/* 3. HOW BINE WORKS (3 cards: Check, Guard, Receipt) */}
         <motion.section {...sectionReveal} className="py-10 sm:py-12">
           <div className="bine-container">
-            <div className="w-full max-w-[1120px] mx-auto space-y-5">
+            <div className="w-full max-w-[1240px] mx-auto space-y-5">
               <div className="flex items-baseline justify-between gap-4 flex-wrap">
                 <h2 className="bine-section-heading m-0">How Bine works</h2>
                 <p className="text-sm m-0" style={{ color: 'var(--text-secondary)' }}>
@@ -291,7 +291,7 @@ export default function Home() {
         {/* 4. WHAT BINE REFUSES + 5. VERIFIED ON BNB CHAIN (Side by side at desktop so total height stays ~2.5 screens) */}
         <motion.section {...sectionReveal} className="py-8 sm:py-10">
           <div className="bine-container">
-            <div className="w-full max-w-[1120px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="w-full max-w-[1240px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* What Bine refuses */}
               <div className="bine-card p-6 sm:p-7 flex flex-col justify-between gap-5">
                 <div className="space-y-3">
@@ -392,7 +392,7 @@ export default function Home() {
         {/* 6. CLOSING BAND */}
         <motion.section {...sectionReveal} className="py-10 sm:py-14">
           <div className="bine-container">
-            <div className="w-full max-w-[1120px] mx-auto bine-card p-7 sm:p-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="w-full max-w-[1240px] mx-auto bine-card p-7 sm:p-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-1.5 max-w-xl">
                 <h2 className="text-xl sm:text-2xl font-semibold m-0">
                   Ready to check a tokenized stock trade?

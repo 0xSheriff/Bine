@@ -136,7 +136,7 @@ export default function Receipts() {
       <TopHeader />
       <main className="flex-1 w-full py-8 sm:py-12">
         <div className="bine-container">
-          <div className="w-full max-w-[1120px] mx-auto space-y-8">
+          <div className="w-full max-w-[1240px] mx-auto space-y-8">
             <div className="max-w-2xl space-y-2">
               <h1 tabIndex={-1} className="bine-section-heading m-0 outline-none">
                 On-chain receipts

@@ -242,7 +242,7 @@ export function TopHeader() {
             <a
               href="/"
               onClick={e => navigateApp('/', e)}
-              className="no-underline shrink-0 inline-flex items-center min-h-[44px] px-1 rounded-lg"
+              className="no-underline shrink-0 inline-flex items-center min-h-[44px] rounded-lg"
               aria-label="Bine home"
             >
               <BineWordmarkLockup tileSize={36} />
@@ -663,7 +663,7 @@ export function Footer() {
       <div className="bine-container">
         <div className="w-full max-w-[1240px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
           <div className="space-y-3">
-            <BineWordmarkLockup tileSize={36} staticTile />
+            <BineWordmarkLockup tileSize={36} />
             <p className="text-sm m-0" style={{ color: 'var(--text-secondary)' }}>
               Built for BNB Hack: Tokenized Stocks Edition on BNB Chain.
             </p>

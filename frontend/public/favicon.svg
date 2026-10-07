@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
   <defs>
     <linearGradient id="chrome" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#F6F7FA" />
-      <stop offset="38%" stop-color="#D4D7E2" />
-      <stop offset="52%" stop-color="#FF8A2B" />
-      <stop offset="64%" stop-color="#3B7BFF" />
-      <stop offset="100%" stop-color="#8A90A2" />
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="36%" stop-color="#E2E5EC" />
+      <stop offset="54%" stop-color="#949AA8" />
+      <stop offset="78%" stop-color="#F5F7FA" />
+      <stop offset="100%" stop-color="#AEB4C2" />
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="#000000" />

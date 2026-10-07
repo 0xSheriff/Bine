@@ -235,7 +235,7 @@ export default function Integrate() {
       <TopHeader />
       <main className="flex-1 w-full py-8 sm:py-12">
         <div className="bine-container">
-          <div className="w-full max-w-[1120px] mx-auto space-y-10">
+          <div className="w-full max-w-[1240px] mx-auto space-y-10">
             {/* Two-sentence intro */}
             <div className="max-w-3xl space-y-2">
               <h1 tabIndex={-1} className="bine-section-heading m-0 outline-none">

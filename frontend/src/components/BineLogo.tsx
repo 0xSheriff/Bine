@@ -69,12 +69,13 @@ export function BineLogoTile({ size = 36, staticOnly = false }: BineLogoTileProp
   }, [])
 
   const radius = Math.round(size * 0.24)
-  const useShader = webGlReady && !reducedMotion && !staticOnly
-  const shaderSpeed = useShader && inView ? 0.51 : 0
+  const useShader = webGlReady && !staticOnly
+  const shaderSpeed = useShader && !reducedMotion && inView ? 0.51 : 0
 
   return (
     <div
       ref={tileRef}
+      data-bine-logo-tile
       aria-hidden="true"
       className="relative inline-flex items-center justify-center overflow-hidden shrink-0 select-none"
       style={{
@@ -85,12 +86,12 @@ export function BineLogoTile({ size = 36, staticOnly = false }: BineLogoTileProp
         boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.12)',
       }}
     >
-      {/* Static masked chrome fallback (always present underneath while shader initializes or when static/reduced-motion) */}
+      {/* Monochrome liquid-chrome fallback (matches LiquidMetal colorTint="#ffffff" on #000000) */}
       <div
         className="w-[78%] h-[78%] pointer-events-none"
         style={{
           backgroundImage:
-            'linear-gradient(135deg, #F7F8FB 0%, #CFD4E2 38%, #FF8424 51%, #2E6BFF 63%, #8A90A4 100%)',
+            'linear-gradient(135deg, #FFFFFF 0%, #E2E5EC 36%, #949AA8 54%, #F5F7FA 78%, #AEB4C2 100%)',
           WebkitMaskImage: `url(${bineMarkPng})`,
           maskImage: `url(${bineMarkPng})`,
           WebkitMaskSize: 'contain',
@@ -136,7 +137,7 @@ interface BineWordmarkLockupProps {
 
 export function BineWordmarkLockup({ tileSize = 36, staticTile = false }: BineWordmarkLockupProps) {
   return (
-    <span className="inline-flex items-center gap-2.5 select-none">
+    <span data-bine-lockup className="inline-flex items-center gap-2.5 select-none">
       <BineLogoTile size={tileSize} staticOnly={staticTile} />
       <span
         style={{

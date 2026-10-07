@@ -63,7 +63,7 @@ export default function Refusals() {
       <TopHeader />
       <main className="flex-1 w-full py-8 sm:py-12">
         <div className="bine-container">
-          <div className="w-full max-w-[1120px] mx-auto space-y-10">
+          <div className="w-full max-w-[1240px] mx-auto space-y-10">
             {/* Page Heading + Live Session Banner */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div className="max-w-2xl space-y-2">

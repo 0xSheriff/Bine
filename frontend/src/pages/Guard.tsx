@@ -463,7 +463,7 @@ export default function Guard() {
 
       <main className="flex-1 py-8 sm:py-12">
         <div className="bine-container">
-          <div className="w-full max-w-[1120px] mx-auto space-y-6">
+          <div className="w-full max-w-[1240px] mx-auto space-y-6">
             {/* Page Heading + Live Mode Status Chip */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div className="space-y-1.5">

@@ -83,3 +83,78 @@ Screenshots inspected: `redesign_integrate_light_1440.png`, `redesign_integrate_
 | **D-21** | High | **Interactive tap targets under `44x44px` on mobile (`390px`)**: CDP measured top nav links at `41x29px`–`68x29px`, logo at `88x36px`, theme toggle at `40x40px`, and header CTA at `141x40px`. | `redesign_home_light_390.png` | WCAG 2.2 AA 2.5.8 Target Size / Mobile Usability | Ensure all interactive buttons, links, tabs, and pills have `min-height: 44px` (and `min-width: 44px` for icon buttons) (`Phase 1–5`). |
 | **D-22** | Medium | **Theme flash risk & no route focus management**: Theme is initialized inside React `useState` rather than a blocking `<head>` script, and navigating between routes leaves focus on the clicked nav link (`first_tab_focus: BODY:`) instead of moving focus to the new page's `<h1>`. | `audit_state_keyboard_focus_1440.png` | WCAG 2.4.3 Focus Order / Dark Mode Best Practices | Add an inline `try/catch` theme bootstrap script in `frontend/index.html` defaulting to `'light'` before first paint, and focus `<h1>` (`tabIndex={-1}`) on route change (`Phase 1`). |
 | **D-23** | Medium | **Main JS bundle exceeds `500 kB` raw (`520.23 kB`)**: `LiquidMetal` shader (`@paper-design/shaders-react`) and all route pages are eagerly bundled into the entry chunk. | Build output | Load Performance (LCP / TTI) | Lazy-load route pages (`React.lazy` + `Suspense`) and lazy-load `LiquidMetal` inside `BineLogo.tsx` so the main chunk is well under `500 kB` raw (`Phase 1`). |
+
+---
+
+## 3. Phase 5 Post-Refinement Browser Pass (All 5 Screens, 3 Viewports, 2 Themes, Interactive States)
+
+### 3.1 Automated Browser & Performance Checks (`phase5_browser_pass.py` + `verify_focus_and_perf.py`)
+- **Matrix coverage**: 30 viewport/theme runs (`landing` `/`, `guard` `/guard`, `refusals` `/refusals`, `receipts` `/receipts`, `developers` `/integrate` across `390px`, `768px`, and `1440px` in `light` and `dark`) plus interactive states (`idle`, `loading`, `BUY NVDA $5.50`, `REFUSE SPYon $250`, `below_issuer_minimum AAPL $2`, `503` error, network error, empty receipts `?empty=1`, keyboard tab navigation, and `prefers-reduced-motion: reduce`).
+- **Cold default theme**: `light` even when OS `prefers-color-scheme: dark` is emulated (`cold_default_theme: "light"`).
+- **Horizontal overflow (`scrollWidth <= innerWidth`)**: `0` failures across all 30 runs (`overflow_failures: []`).
+- **Interactive tap target height (`>= 44px`)**: `0` failures across all 30 runs (`undersized_failures: []`, after increasing the combobox toggle button in `Guard.tsx` from `40x40px` to `44x44px`).
+- **Route change focus management**: Clicking `/guard` focuses `<h1>Pre-Trade Guard</h1>` (`active_on_guard: { tag: "H1", text: "Pre-Trade Guard" }`); clicking `/refusals` focuses `<h1>Why Bine says no</h1>` (`active_on_refusals: { tag: "H1", text: "Why Bine says no" }`).
+- **Keyboard navigation**: WAI-ARIA APG combobox (`ArrowDown`, `ArrowUp`, `Enter`, `Escape`) on `/guard` and WAI-ARIA APG tabs (`ArrowRight` moves focus from `#tab-http` to `#tab-cli`, `tab_kb_test: "tab-cli"`) on `/integrate`.
+- **Paint & load timings (headless Chrome 154 on `1440x900`)**:
+  - `/` (`Home`): `first-paint: 344 ms`, `first-contentful-paint: 500 ms`, `domInteractive: 66 ms`, `loadEventEnd: 336 ms`; total page height `2.51` screens at `1440px`.
+  - `/guard` (`Guard`): `first-paint: 92 ms`, `first-contentful-paint: 440 ms`, `domInteractive: 15 ms`, `loadEventEnd: 48 ms`.
+- **Console errors / uncaught exceptions**: `0` (`console_errors: []`).
+- **External network hosts**: `0` (`external_hosts: []`).
+
+### 3.2 Screen-by-Screen Post-Refinement Scores (`0-10`)
+
+#### 1. Landing (`/`)
+- **Screenshots**: `p5_landing_light_1440.png`, `p5_landing_dark_1440.png`, `p5_landing_light_768.png`, `p5_landing_light_390.png`
+- **Scores**: Usability `9/10` | Simplicity `9/10` | Aesthetics `9/10` | Layout `9/10`
+- **Justification for scores > 8**: Total desktop height is `2.51` screens (`2259px` at `1440x900`), the hero headline sits cleanly in 2 balanced lines with generous separation from the 3D lavender ring and gold coin, the primary and secondary pills sit directly below the headline followed by the `520px` body copy, and the proof strip links live counts (`448` tokens, `8` rules, `2` verified swaps) directly to `/guard`, `/refusals`, and `/receipts`.
+- **5 Worst Remaining Defects / Tradeoffs**:
+  1. On `390px` mobile, the stacked 3D ring SVG adds ~`210px` of vertical height between the intro paragraph and the proof strip.
+  2. The proof strip shows `448` catalog tickers only after `/api/tickers` resolves (initial render shows `448` fallback, which matches the current catalog size).
+  3. The featured refusal card on `/` shows one representative case (`SPYon $250`); users must click through to `/refusals` to compare all 6 recorded refusals.
+  4. The `LiquidMetal` header tile relies on WebGL and falls back to a static metallic gradient when WebGL or `prefers-reduced-motion` is active.
+  5. BscTrace links open in a new tab (`target="_blank"`), requiring an external block explorer to inspect raw logs.
+
+#### 2. Guard (`/guard`)
+- **Screenshots**: `p5_guard_light_1440.png`, `p5_state_guard_buy_1440.png`, `p5_state_guard_refuse_spyon_1440.png`, `p5_state_guard_below_min_1440.png`, `p5_guard_light_390.png`
+- **Scores**: Usability `9/10` | Simplicity `9/10` | Aesthetics `9/10` | Layout `9/10`
+- **Justification for scores > 8**: Dedicated two-column workspace (`max-width: 1120px`) with WAI-ARIA APG combobox (`448` searchable tickers with issuer badges), quick amount chips (`$2`, `$5.50`, `$25`, `$250`), inline validation (`> $0` and `<= $2,500`), 3 one-click presets, 5 plain-English metrics on `BUY`, all `8/8` guard checks shown with pass/fail badges, progressive disclosure for `Route details` and `Compare issuers`, and recovery CTA on `REFUSE`.
+- **5 Worst Remaining Defects / Tradeoffs**:
+  1. At `768px` tablet width, the 5-metric grid wraps into 3+2 cards rather than a single 5-column row.
+  2. The `Compare issuers` table requires horizontal scrolling inside its card container on `390px` viewports due to 7 data columns.
+  3. Live quote evaluation takes ~`0.9s-1.3s` when the backend fetches fresh `/aggregator/quote` and `/top-liquidity` data from Binance Web3 APIs.
+  4. The combobox filters up to 8 visible suggestions at a time (`slice(0, 8)`) to keep the dropdown compact, so broad queries require typing 2+ characters.
+  5. Dry-run simulation against router `0xB444...` reports `Sim router needs allowance` even when the `baw` router (`0xb300...`) already has `uint256.max` allowance (explained via tooltip and README).
+
+#### 3. Refusals (`/refusals`)
+- **Screenshots**: `p5_refusals_light_1440.png`, `p5_state_refusals_live_run_1440.png`, `p5_refusals_dark_1440.png`, `p5_refusals_light_390.png`
+- **Scores**: Usability `9/10` | Simplicity `9/10` | Aesthetics `9/10` | Layout `9/10`
+- **Justification for scores > 8**: Combines the complete 8-rule specification table (rule name, code, protection purpose, threshold) with 6 recorded refusal cards from `recorded-refusals.json` and a one-request-at-a-time `"Run live now"` comparator that displays the live verdict and market session right beside the recorded Oct 5 evidence without firing 5 parallel API calls on page load.
+- **5 Worst Remaining Defects / Tradeoffs**:
+  1. On `390px` mobile, the 4-column rule legend table scrolls horizontally inside its card wrapper.
+  2. Running a live check on a recorded refusal during a different market session (e.g., `overnight` vs `regular`) can return a different refusal code or a `BUY` verdict, which requires reading the session badge in the comparison box.
+  3. Only one `"Run live now"` request can run at a time (`disabled={Boolean(runningId)}`), so checking all 6 cards sequentially takes 6 clicks.
+  4. The live session banner uses `NVDA` `$5.50` as its reference probe (`quote-session-banner`).
+  5. Recorded refusal timestamps are shown in `UTC` (`Recorded Oct 5, 15:04 UTC (regular session)`) to match the raw JSONL logs.
+
+#### 4. Receipts (`/receipts`)
+- **Screenshots**: `p5_receipts_light_1440.png`, `p5_state_receipts_empty_1440.png`, `p5_receipts_dark_1440.png`, `p5_receipts_light_390.png`
+- **Scores**: Usability `9/10` | Simplicity `9/10` | Aesthetics `9/10` | Layout `9/10`
+- **Justification for scores > 8**: Displays computed summary totals (`2` verified swaps, `$4.00` total USDT spent, `0.00008384 BNB` total gas) above expandable receipt cards with both absolute and human-relative timestamps (`Oct 5, 16:05 WAT, 1 day ago`), filled vs quoted shares (`-0.53 bps` and `-0.13 bps`), block numbers (`125889084` and `125555002`), BNB gas fees, one-click `Copy tx hash` with `aria-live` feedback, and preceding dry-run sequence notes.
+- **5 Worst Remaining Defects / Tradeoffs**:
+  1. Only `Decision #18` is expanded by default on initial load; `Decision #16` requires clicking `Show details` to inspect its `approve_tx_hash` and block number.
+  2. Long 66-character hexadecimal transaction hashes wrap onto two lines on `390px` screens (`break-all`).
+  3. USD value of BNB gas (`~$0.04`) is not shown next to the raw BNB amount (`0.00008384 BNB`) because historical BNB/USD spot price at the block timestamp is not stored in `decision_log`.
+  4. If a new live swap is executed without updating `onchain-receipts.json`, `block_number` and `gas_bnb` fall back to `N/A` until reconciled from RPC.
+  5. Dry-run-only decisions (`DRY_RUN_OK`) are excluded from `/receipts` by design and only appear in the Guard page's recent decisions disclosure.
+
+#### 5. Developers (`/integrate`)
+- **Screenshots**: `p5_developers_light_1440.png`, `p5_developers_dark_1440.png`, `p5_developers_light_768.png`, `p5_developers_light_390.png`
+- **Scores**: Usability `9/10` | Simplicity `9/10` | Aesthetics `9/10` | Layout `9/10`
+- **Justification for scores > 8**: Replaces 5 long stacked code blocks with WAI-ARIA APG keyboard-navigable tabs (`HTTP`, `CLI`, `MCP`, `Agent skill`), includes an interactive `"Try it"` button on the `HTTP` tab that executes a live `GET /api/quote?ticker=NVDA&amount_usd=5.50` call and renders the real JSON payload inline, and documents all 13 frozen `schema_version: "1"` response fields plus the `401/403`, `429`, and `503` error contracts.
+- **5 Worst Remaining Defects / Tradeoffs**:
+  1. The live `"Try it"` button is only available on the `HTTP` tab (since `CLI`, `MCP`, and `Agent skill` run in the user's terminal or MCP client).
+  2. The live JSON response preview caps height at `max-h-[340px]` with internal scroll to avoid pushing the response fields table off-screen.
+  3. On `390px` mobile, the `Response fields` and `Errors` tables require horizontal scrolling inside their card containers.
+  4. Code blocks use `http://localhost:8000` as the default `BINE_API_URL` rather than dynamically substituting a remote host.
+  5. Syntax highlighting is intentionally omitted in `<pre><code>` blocks to keep bundle weight zero-dependency and high-contrast in both themes.
+

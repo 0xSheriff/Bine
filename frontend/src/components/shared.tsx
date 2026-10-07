@@ -116,17 +116,27 @@ export function XIcon({ size = 22 }: { size?: number }) {
   )
 }
 
-export function focusPageHeading() {
+let pendingRouteFocus = false
+
+export function focusPageHeading(previousH1?: Element | null) {
   if (typeof window === 'undefined') return
-  window.setTimeout(() => {
+  const tryFocus = (attempt: number) => {
     const h1 = document.querySelector('main h1, h1') as HTMLElement | null
-    if (h1) {
+    if (h1 && (!previousH1 || h1 !== previousH1)) {
       if (!h1.hasAttribute('tabindex')) {
         h1.setAttribute('tabindex', '-1')
       }
       h1.focus({ preventScroll: true })
+      if (document.activeElement === h1) {
+        pendingRouteFocus = false
+        return
+      }
     }
-  }, 60)
+    if (attempt < 15) {
+      window.setTimeout(() => tryFocus(attempt + 1), 50)
+    }
+  }
+  window.setTimeout(() => tryFocus(0), 20)
 }
 
 export function navigateApp(href: string, e?: React.MouseEvent<HTMLAnchorElement>) {
@@ -145,10 +155,12 @@ export function navigateApp(href: string, e?: React.MouseEvent<HTMLAnchorElement
   if (e) e.preventDefault()
 
   if (!samePath) {
+    const prevH1 = document.querySelector('main h1, h1')
+    pendingRouteFocus = true
     window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`)
     window.dispatchEvent(new PopStateEvent('popstate'))
     window.scrollTo({ top: 0, behavior: 'auto' })
-    focusPageHeading()
+    focusPageHeading(prevH1)
   } else if (url.hash) {
     const id = url.hash.slice(1)
     window.setTimeout(() => {
@@ -188,6 +200,12 @@ export function TopHeader() {
       // ignore storage errors
     }
   }, [theme])
+
+  useEffect(() => {
+    if (pendingRouteFocus) {
+      focusPageHeading()
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

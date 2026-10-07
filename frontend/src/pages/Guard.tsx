@@ -551,7 +551,7 @@ export default function Guard() {
                         tabIndex={-1}
                         aria-label="Toggle ticker suggestions"
                         onClick={() => setComboOpen(prev => !prev)}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 w-10 h-10 inline-flex items-center justify-center rounded-lg cursor-pointer bg-transparent border-0"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg cursor-pointer bg-transparent border-0"
                         style={{ color: 'var(--text-secondary)' }}
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

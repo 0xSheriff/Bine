@@ -69,8 +69,8 @@ export default function Home() {
       <main className="flex-1">
         {/* 1. HERO SECTION (min(88vh, 760px)) */}
         <section className="relative overflow-hidden md:min-h-[min(88vh,760px)] flex items-center py-10 sm:py-14 md:py-16">
-          {/* Desktop / Tablet Right-Side Ring Art (never touches nav or bottom edge) */}
-          <div className="hidden md:flex absolute top-8 bottom-8 right-0 w-[56%] lg:w-[54%] items-center justify-end pointer-events-none z-0 pr-4">
+          {/* Desktop / Tablet Right-Side Ring Art (never touches nav, headline, or bottom edge) */}
+          <div className="hidden md:flex absolute top-8 bottom-8 right-0 w-[49%] lg:w-[47%] translate-x-6 items-center justify-end pointer-events-none z-0 pr-2">
             <HeroArt />
           </div>
 

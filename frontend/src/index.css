@@ -182,11 +182,21 @@ details > summary::-webkit-details-marker {
   color: var(--text);
 }
 
-.bine-body-copy {
+.bine-body-copy,
+.bine-body {
   font-size: 17px;
   line-height: 1.55;
   text-wrap: pretty;
   color: var(--text-secondary);
+}
+
+.bine-section-heading {
+  font-weight: 600;
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  color: var(--text);
 }
 
 /* Flat white/dark card surface */

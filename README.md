@@ -4,9 +4,35 @@
 
 ---
 
+## For judges
+
+1. **How to run**:
+   - Backend (`http://localhost:8000`):
+     `set -a; source .env; set +a; DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend --host 0.0.0.0 --port 8000`
+   - Frontend (`http://localhost:5173` or `http://localhost:5174`):
+     `npm --prefix frontend run dev -- --host 0.0.0.0 --port 5173`
+   - CLI:
+     `backend/.venv/bin/bine check NVDA 5.50`
+2. **4 presets to try on `/guard`**:
+   - **`NVDA $5.50`** (`BUY`): Compares `NVDAB` (bStocks) and `NVDAon` (Ondo), checks the 5 bps tie band, and enables `"Preview trade (dry-run)"` via `POST /api/v1/dex/pre-transaction/simulate`.
+   - **`AAPL $2`** (`REFUSE` / `below_issuer_minimum`): Triggers Ondo's `[40375] Minimum order amount is 5 USD.` rule with a one-click `"Try $5.50 instead"` action.
+   - **`SPYon $250`** (`REFUSE` / `slippage_too_high` off-hours, `BUY` regular hours): Demonstrates the off-hours PancakeSwap V3 pool thinness (`+40.75%` to `+82.07%` above reference) vs regular-hours Ondo RWA (`+0.0037%`).
+   - **`KLAC $5.50`** (`REFUSE` / `depth_thin` + `quality_unreliable` share-ratio limit): Surfaces `KLACon`'s `10.02567794x` share ratio (`$20,851.52` per token vs `$2,079.73` per share), outside the `0.25-5.00x` supported range.
+3. **What to look at**:
+   - **`/` (Landing page)**: Product overview, live proof strip, 3-step pipeline, 3 recorded refusal highlights, and 2 verified BNB Chain receipt summaries.
+   - **`/guard` (Pre-Trade Guard)**: Accessible WAI-ARIA combobox across all 448 tickers, 5 plain-English decision metrics, 6 guard checks, `"Preview trade (dry-run)"` simulation panel, and progressive disclosures (`How this was calculated`, `Compare issuers`, `Recent checks`).
+   - **`/refusals` (Why Bine says no)**: All 8 refusal rules in plain English, 6 recorded empirical refusals from Oct 5 regular and overnight sessions, and a one-at-a-time `"Run live now"` comparator.
+   - **`/receipts` (On-chain receipts)**: Both verified live `$2.00` `NVDAB` swaps on BNB Chain with expandable BscScan / BscTrace verification details, filled vs quoted shares, block numbers, and BNB gas paid.
+   - **`/integrate` (Developers)**: Copy-paste integration for `HTTP` (with live `"Try it"` runner), `CLI`, `MCP`, and `Agent skill`, plus the 13-key response contract and error table.
+4. **On-chain receipts**:
+   - **Swap #1 (`Decision #16`, Oct 3 off-hours, `$2.00` USDT -> `NVDAB`)**: [`docs/live_swap_nvda_2usd.json`](docs/live_swap_nvda_2usd.json) (`txHash`: `0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`, `-0.13 bps` vs quote).
+   - **Swap #2 (`Decision #18`, Oct 5 regular hours, `$2.00` USDT -> `NVDAB`)**: [`docs/live_swap_nvda_2usd_second_2026-10-05.json`](docs/live_swap_nvda_2usd_second_2026-10-05.json) (`txHash`: `0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75`, BSC Block `125889084`, `0.00 bps` vs quote, zero hand edits).
+
+---
+
 ## Run it in 3 commands
 
-Requires `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` for the Binance Web3 Open API (`https://web3.binance.com/build`). Without valid keys in `.env`, the Open API path `GET /api/v1/dex/market/rwa/tokens` returns `HTTP 401` (`code: 40101`, `"API Key is required"` — while the non-API path `/rwa/tokens` returns an `HTTP 302` redirect to the web UI; see [`docs/raw/rwa_tokens_no_key_2026-10-05.txt`](docs/raw/rwa_tokens_no_key_2026-10-05.txt)), `/api/quote` returns `HTTP 503` (`"Binance API keys missing or rejected"`), and `bine` prints that single line with exit code `1`.
+Requires `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` for the Binance Web3 Open API (`https://web3.binance.com/build`). Without valid keys in `.env`, the Open API path `GET /api/v1/dex/market/rwa/tokens` returns `HTTP 401` (`code: 40101`, `"API Key is required"`, while the non-API path `/rwa/tokens` returns an `HTTP 302` redirect to the web UI; see [`docs/raw/rwa_tokens_no_key_2026-10-05.txt`](docs/raw/rwa_tokens_no_key_2026-10-05.txt)), `/api/quote` returns `HTTP 503` (`"Binance API keys missing or rejected"`), and `bine` prints that single line with exit code `1`.
 
 ```bash
 git clone <repo-url> bine && cd bine && python3 -m venv .venv && .venv/bin/pip install -e backend
@@ -20,12 +46,13 @@ printf "BINANCE_API_KEY=<your-key>\nBINANCE_SECRET_KEY=<your-secret>\n" > .env &
 
 ## Local URL & Web Routes
 
-- **Local API & Web App**: `http://localhost:8000` (frontend dev server: `http://localhost:5173`)
+- **Local API & Web App**: `http://localhost:8000` (frontend dev server: `http://localhost:5173` or `http://localhost:5174`)
 - **Routes**:
-  - `/` — Pre-trade guard (`NVDA` at `$5.50` default) + Transaction API `/simulate` dry-run
-  - `/integrate` — Copy-paste snippets for `curl`, `bine`, MCP config JSON, Wallet Skill install, and frozen v1 schema
-  - `/refusals` — Live refusal cards fetched from `GET /api/quote` and `/api/tickers` (`below_issuer_minimum`, `slippage_too_high`, `quality_unreliable`, share-ratio limit, `market_closed`)
-  - `/receipts` — Read-only list of executed on-chain trades with `tx_hash` and BscTrace links (dry-runs excluded)
+  - `/` - Landing page with proof strip, 3-step explanation, recorded refusals preview, and verified BNB Chain receipts
+  - `/guard` - Interactive pre-trade guard (`NVDA` at `$5.50` default) + Transaction API `/simulate` dry-run
+  - `/refusals` - All 8 refusal rules, 6 recorded empirical refusals from Oct 5, and one-at-a-time `"Run live now"` comparator
+  - `/receipts` - Verified on-chain trades with expandable BscScan / BscTrace details, filled vs quoted shares, and BNB gas
+  - `/integrate` - Tabbed integration reference (`HTTP`, `CLI`, `MCP`, `Agent skill`) with live `"Try it"` runner
 
 ---
 

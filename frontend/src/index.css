@@ -322,19 +322,20 @@ details > summary::-webkit-details-marker {
 .bine-glass-panel {
   --mx: 50%;
   --my: 0%;
+  --glass-outer-tint-alpha: 0.5;
   position: relative;
   border-radius: var(--card-radius);
   overflow: hidden;
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   background:
-    radial-gradient(240px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.22), transparent 100%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.36));
-  border: 1px solid rgba(255, 255, 255, 0.55);
+    radial-gradient(260px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.42), transparent 100%),
+    linear-gradient(135deg, rgba(226, 225, 240, 0.52), rgba(210, 209, 230, 0.48));
+  border: 1px solid rgba(185, 184, 207, 0.65);
   box-shadow:
-    0 20px 50px rgba(15, 17, 21, 0.10),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 0 rgba(15, 17, 21, 0.06);
+    0 20px 48px rgba(15, 17, 26, 0.10),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(15, 17, 26, 0.08);
   will-change: transform, opacity;
 }
 
@@ -347,26 +348,34 @@ details > summary::-webkit-details-marker {
 
 [data-theme="dark"] .bine-glass-panel {
   background:
-    radial-gradient(240px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.22), transparent 100%),
-    linear-gradient(135deg, rgba(28, 31, 40, 0.72), rgba(18, 20, 28, 0.44));
-  border: 1px solid rgba(255, 255, 255, 0.14);
+    radial-gradient(260px circle at var(--mx) var(--my), rgba(214, 213, 230, 0.24), transparent 100%),
+    linear-gradient(135deg, rgba(38, 42, 58, 0.52), rgba(22, 25, 36, 0.48));
+  border: 1px solid rgba(214, 213, 230, 0.22);
   box-shadow:
-    0 24px 60px rgba(0, 0, 2, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    0 24px 60px rgba(0, 0, 2, 0.60),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Interior readability scrim so body text stays >= 4.5:1 over any background including lavender ring */
+/* Inner contrast plate (< 0.85 alpha) inside the ~0.50 outer liquid-glass frame */
 .bine-glass-scrim {
   position: relative;
   z-index: 1;
-  border-radius: calc(var(--card-radius) - 4px);
-  padding: 16px;
-  background-color: rgba(255, 255, 255, 0.88);
+  border-radius: calc(var(--card-radius) - 6px);
+  padding: 18px 20px;
+  background-color: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 4px 16px rgba(15, 17, 26, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 [data-theme="dark"] .bine-glass-scrim {
-  background-color: rgba(12, 14, 20, 0.90);
+  background-color: rgba(12, 14, 20, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* At 390px / mobile (< 640px), expanded glass panels behave as a scrollable bottom sheet or bounded sheet */

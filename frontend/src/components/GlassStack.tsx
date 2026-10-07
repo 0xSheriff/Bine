@@ -186,8 +186,9 @@ export function GlassDetailPanel({
       aria-labelledby={headingId}
       data-glass-panel
       onPointerMove={handlePointerMove}
-      className="bine-glass-panel mt-3 p-5 sm:p-6"
+      className="bine-glass-panel mt-3 p-4 sm:p-5"
     >
+      <BineGlassFilterDef />
       <div className="bine-glass-scrim space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">

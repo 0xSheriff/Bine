@@ -24,6 +24,7 @@ import type {
 } from '../types'
 import {
   GUARD_RULE_DEFINITIONS,
+  GUARD_RULES_COUNT,
   humanizeCode,
   humanizeStatus,
 } from '../lib/humanize'
@@ -67,16 +68,7 @@ function deriveGuardChecks(
   selectedRow: IssuerDetailRow | undefined,
 ): DerivedRuleCheck[] {
   const failedCode = q.verdict === 'REFUSE' ? q.refusal?.code || null : null
-  const order = [
-    'unknown_ticker',
-    'amount_over_cap',
-    'below_issuer_minimum',
-    'quality_unreliable',
-    'market_closed',
-    'reference_stale',
-    'depth_thin',
-    'slippage_too_high',
-  ]
+  const order = Object.keys(GUARD_RULE_DEFINITIONS)
 
   return order.map(code => {
     const def = GUARD_RULE_DEFINITIONS[code]
@@ -291,6 +283,8 @@ export default function Guard() {
     setAmountInput(String(amt))
     setComboOpen(false)
     setDryRunReceipt(null)
+    setOpenMetricId(null)
+    setOpenCheckCode(null)
     syncUrlParams(normalizedTkr, amt)
     if (
       submittedQuery &&
@@ -444,7 +438,7 @@ export default function Guard() {
                   Pre-Trade Guard
                 </h1>
                 <p className="text-sm sm:text-base m-0" style={{ color: 'var(--text-secondary)' }}>
-                  Compare bStocks and Ondo on BNB Chain and run all 8 safety rules before you sign.
+                  Compare bStocks and Ondo on BNB Chain and run all {GUARD_RULES_COUNT} safety rules before you sign.
                 </p>
               </div>
               <LiveModeChip />
@@ -1473,45 +1467,91 @@ DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend -
                       </span>
                     </div>
 
-                    {/* Guard Checks List on Refusal */}
+                    {/* Guard Checks List on Refusal (clickable to open GlassDetailPanel) */}
                     <div className="space-y-2.5">
-                      <h3 className="text-sm font-semibold m-0" style={{ color: 'var(--text)' }}>
-                        Guard checks
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {guardChecks.map(chk => (
-                          <div
-                            key={chk.code}
-                            className="flex items-start gap-2.5 p-3 rounded-xl text-xs"
-                            style={{ backgroundColor: 'var(--surface-subtle)' }}
-                          >
-                            <span
-                              className="inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0 font-bold mt-0.5"
-                              style={{
-                                backgroundColor: chk.passed
-                                  ? 'var(--chip-good-bg)'
-                                  : 'var(--chip-bad-bg)',
-                                color: chk.passed ? 'var(--good)' : 'var(--bad)',
-                              }}
-                              aria-hidden="true"
-                            >
-                              {chk.passed ? '✓' : '✕'}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="font-semibold" style={{ color: 'var(--text)' }}>
-                                {chk.name}
-                              </div>
-                              <div
-                                className="truncate"
-                                title={chk.detail}
-                                style={{ color: 'var(--text-secondary)' }}
-                              >
-                                {chk.detail}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold m-0" style={{ color: 'var(--text)' }}>
+                          Guard checks ({guardChecks.filter(c => c.passed).length}/{guardChecks.length} passed)
+                        </h3>
+                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          Click any check to inspect rule threshold
+                        </span>
                       </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {guardChecks.map(chk => {
+                          const isOpen = openCheckCode === chk.code
+                          return (
+                            <button
+                              key={chk.code}
+                              ref={el => {
+                                checkTriggerRefs.current[chk.code] = el
+                              }}
+                              type="button"
+                              aria-expanded={isOpen}
+                              aria-controls={`guard-refuse-check-glass-${chk.code}`}
+                              onClick={() =>
+                                runGlassViewTransition(() => {
+                                  setOpenCheckCode(prev => (prev === chk.code ? null : chk.code))
+                                }, reducedMotion)
+                              }
+                              className={`flex items-start gap-2.5 p-3 rounded-xl text-xs text-left cursor-pointer min-h-[44px] bine-glass-trigger ${
+                                isOpen ? 'bine-glass-trigger-active' : ''
+                              }`}
+                              style={{ backgroundColor: 'var(--surface-subtle)' }}
+                            >
+                              <span
+                                className="inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0 font-bold mt-0.5"
+                                style={{
+                                  backgroundColor: chk.passed
+                                    ? 'var(--chip-good-bg)'
+                                    : 'var(--chip-bad-bg)',
+                                  color: chk.passed ? 'var(--good)' : 'var(--bad)',
+                                }}
+                                aria-hidden="true"
+                              >
+                                {chk.passed ? '✓' : '✕'}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold" style={{ color: 'var(--text)' }}>
+                                  {chk.name}
+                                </div>
+                                <div
+                                  className="truncate"
+                                  title={chk.detail}
+                                  style={{ color: 'var(--text-secondary)' }}
+                                >
+                                  {chk.detail}
+                                </div>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {openCheckCode && GUARD_RULE_DEFINITIONS[openCheckCode] && (
+                        <GlassDetailPanel
+                          id={`guard-refuse-check-glass-${openCheckCode}`}
+                          isOpen={true}
+                          onClose={() =>
+                            runGlassViewTransition(() => {
+                              setOpenCheckCode(null)
+                            }, reducedMotion)
+                          }
+                          title={GUARD_RULE_DEFINITIONS[openCheckCode].name}
+                          subtitle={`Rule threshold: ${GUARD_RULE_DEFINITIONS[openCheckCode].threshold}`}
+                          triggerRef={{
+                            get current() {
+                              return openCheckCode ? checkTriggerRefs.current[openCheckCode] ?? null : null
+                            },
+                          }}
+                        >
+                          <p className="m-0">{GUARD_RULE_DEFINITIONS[openCheckCode].explanation}</p>
+                          <p className="m-0 text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                            Current quote evaluation:{' '}
+                            {guardChecks.find(c => c.code === openCheckCode)?.detail}
+                          </p>
+                        </GlassDetailPanel>
+                      )}
                     </div>
 
                     {/* Compare Issuers Disclosure */}

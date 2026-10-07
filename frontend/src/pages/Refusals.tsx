@@ -11,7 +11,7 @@ import {
   navigateApp,
 } from '../components/shared'
 import recordedRefusals from '../data/recorded-refusals.json'
-import { GUARD_RULE_DEFINITIONS, humanizeCode, humanizeStatus } from '../lib/humanize'
+import { GUARD_RULE_DEFINITIONS, GUARD_RULES_COUNT, humanizeCode, humanizeStatus } from '../lib/humanize'
 import type { QuoteVerdictResponse } from '../types'
 
 export default function Refusals() {
@@ -85,7 +85,7 @@ export default function Refusals() {
                   Why Bine says no
                 </h1>
                 <p className="bine-body m-0" style={{ color: 'var(--text-secondary)' }}>
-                  Every trade runs through 8 deterministic pre-trade checks. Click any rule row or recorded refusal card to open its liquid-glass breakdown and run a live check.
+                  Every trade runs through {GUARD_RULES_COUNT} deterministic pre-trade checks. Click any rule row or any of the {recordedRefusals.length} recorded refusal cards to open its liquid-glass breakdown and run a live check.
                 </p>
               </div>
 
@@ -112,11 +112,11 @@ export default function Refusals() {
               </div>
             </div>
 
-            {/* 1. 8-Rule Legend (Code column removed per Phase A; clickable rows open GlassDetailPanel) */}
+            {/* 1. Rule Legend (Code column removed per Phase A; clickable rows open GlassDetailPanel) */}
             <section aria-labelledby="rule-legend-heading" className="space-y-4">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 id="rule-legend-heading" className="text-lg font-semibold m-0">
-                  The 8 pre-trade guard rules
+                  The {GUARD_RULES_COUNT} pre-trade guard rules
                 </h2>
                 <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
                   Click any rule to inspect its threshold &amp; data source
@@ -215,10 +215,10 @@ export default function Refusals() {
             <section aria-labelledby="recorded-evidence-heading" className="space-y-4">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 id="recorded-evidence-heading" className="text-lg font-semibold m-0">
-                  Recorded refusal evidence
+                  Recorded refusal evidence ({recordedRefusals.length})
                 </h2>
                 <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Click &ldquo;Inspect glass details&rdquo; or &ldquo;Run live now&rdquo; on any card (one open at a time).
+                  Click &ldquo;Inspect details&rdquo; or &ldquo;Run live now&rdquo; on any card (one open at a time).
                 </span>
               </div>
 

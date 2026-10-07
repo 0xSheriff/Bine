@@ -339,13 +339,15 @@ def main() -> int:
                 {"width": 1440, "height": 900, "deviceScaleFactor": 1, "mobile": False},
             )
             cdp.send("Page.navigate", {"url": f"{BASE_URL}{path}"})
-            # Wait for .bine-glass-trigger to mount (especially on /guard while /api/quote resolves)
-            for _ in range(30):
-                has_trigger = cdp.eval_js("Boolean(document.querySelector('.bine-glass-trigger'))")
+            # Wait for .bine-glass-trigger and initial header shader canvas to settle
+            for _ in range(75):
+                has_trigger = cdp.eval_js(
+                    "Boolean(document.querySelector('.bine-glass-trigger') && document.querySelector('[data-bine-logo-tile] canvas'))"
+                )
                 if has_trigger:
                     break
                 time.sleep(0.2)
-            time.sleep(0.3)
+            time.sleep(0.4)
 
             perf = cdp.eval_js(
                 """
@@ -445,7 +447,7 @@ def main() -> int:
                     )
                     cdp.send("Page.navigate", {"url": f"{BASE_URL}{path}"})
                     # Wait for .bine-glass-trigger to mount
-                    for _ in range(30):
+                    for _ in range(75):
                         ready = cdp.eval_js(
                             "Boolean(document.querySelector('.bine-glass-trigger'))"
                         )
@@ -536,6 +538,12 @@ def main() -> int:
                           let secondaryColor = null;
                           let scrimBg = null;
                           let scrimRect = null;
+                          let outerGlassAlpha = null;
+                          if (panel) {
+                            const pcs = window.getComputedStyle(panel);
+                            const rawAlpha = (pcs.getPropertyValue('--glass-outer-tint-alpha') || '').trim();
+                            outerGlassAlpha = rawAlpha ? parseFloat(rawAlpha) : 0.5;
+                          }
                           if (scrim) {
                             const cs = window.getComputedStyle(scrim);
                             primaryColor = cs.color;
@@ -561,6 +569,7 @@ def main() -> int:
                             innerWidth: window.innerWidth,
                             overflow,
                             hasGlassPanel: Boolean(panel),
+                            outerGlassAlpha,
                             primaryColor,
                             secondaryColor,
                             scrimBg,
@@ -590,11 +599,12 @@ def main() -> int:
                         f"Saved {os.path.relpath(out_path)} (glass_open={check['hasGlassPanel']}, overflow={check['overflow']})"
                     )
 
-                    # Item 2: Compute WCAG contrast ratios at 390 and 1440 in light and dark
+                    # Item 2 & Item 4: Compute WCAG contrast ratios on the inner plate (.bine-glass-scrim)
+                    # inside the ~0.50 outer glass panel at 390 and 1440 in light and dark.
                     if w in (390, 1440) and page_name in ("landing", "guard") and check["scrimRect"]:
                         pw, ph, post_rows = decode_png_rgb(shot_bytes)
                         sr = check["scrimRect"]
-                        # Sample pixels inside the rendered open glass scrim and also behind the panel
+                        # Sample pixels inside the rendered inner plate (.bine-glass-scrim) and behind the panel
                         scrim_pixels = sample_region_pixels(
                             post_rows, pw, ph, sr["x0"] + 8, sr["y0"] + 8, sr["x1"] - 8, sr["y1"] - 8, step=6
                         )
@@ -625,15 +635,15 @@ def main() -> int:
                         prim_rgba = parse_css_rgba(check["primaryColor"])
                         sec_rgba = parse_css_rgba(check["secondaryColor"])
                         scrim_rgba = parse_css_rgba(check["scrimBg"])
+                        outer_alpha = float(check["outerGlassAlpha"] or 0.5)
+                        outer_tint_rgba = (
+                            (218.0, 217.0, 235.0, outer_alpha)
+                            if theme == "light"
+                            else (30.0, 33.5, 47.0, outer_alpha)
+                        )
                         prim_rgb = (prim_rgba[0], prim_rgba[1], prim_rgba[2])
                         sec_rgb = (sec_rgba[0], sec_rgba[1], sec_rgba[2])
 
-                        # Worst-case backdrop pixel:
-                        # - In light mode (dark text), worst-case backdrop is the darkest pixel (lowest luminance)
-                        #   excluding dark text/pill pixels in the hero (filter to backdrop luminance range > 0.25 in light mode,
-                        #   which includes the lavender ring #B9B8CF at L~0.49 and gold coin #E3CF8A at L~0.64).
-                        # - In dark mode (light text), worst-case backdrop is the brightest pixel (highest luminance),
-                        #   including the lavender ring / gold coin if a glass panel sits over it!
                         if theme == "light":
                             bg_candidates = [
                                 px for px in backdrop_pixels if relative_luminance(px) >= 0.25
@@ -645,22 +655,41 @@ def main() -> int:
                             ] or backdrop_pixels
                             worst_raw_backdrop = max(bg_candidates, key=relative_luminance)
 
-                        composited_bg = composite_over(scrim_rgba, worst_raw_backdrop)
-                        prim_ratio = round(wcag_contrast_ratio(prim_rgb, composited_bg), 2)
-                        sec_ratio = round(wcag_contrast_ratio(sec_rgb, composited_bg), 2)
+                        # Plate alone over worst backdrop pixel (conservative bound)
+                        plate_only_bg = composite_over(scrim_rgba, worst_raw_backdrop)
+                        # Outer glass (~0.50) + inner plate (0.82) over worst backdrop pixel
+                        outer_bg = composite_over(outer_tint_rgba, worst_raw_backdrop)
+                        plate_in_glass_bg = composite_over(
+                            scrim_rgba,
+                            (int(round(outer_bg[0])), int(round(outer_bg[1])), int(round(outer_bg[2]))),
+                        )
+
+                        prim_ratio = round(wcag_contrast_ratio(prim_rgb, plate_only_bg), 2)
+                        sec_ratio = round(wcag_contrast_ratio(sec_rgb, plate_only_bg), 2)
+                        prim_in_glass_ratio = round(wcag_contrast_ratio(prim_rgb, plate_in_glass_bg), 2)
+                        sec_in_glass_ratio = round(wcag_contrast_ratio(sec_rgb, plate_in_glass_bg), 2)
 
                         record = {
                             "page": page_name,
                             "theme": theme,
                             "width": w,
+                            "outer_glass_tint_alpha": outer_alpha,
+                            "inner_plate_rgba": list(scrim_rgba),
                             "primary_rgb": [int(x) for x in prim_rgb],
                             "secondary_rgb": [int(x) for x in sec_rgb],
-                            "scrim_rgba": list(scrim_rgba),
                             "worst_backdrop_pixel_rgb": list(worst_raw_backdrop),
-                            "composited_scrim_rgb": [round(x, 1) for x in composited_bg],
+                            "plate_over_backdrop_rgb": [round(x, 1) for x in plate_only_bg],
+                            "plate_in_glass_rgb": [round(x, 1) for x in plate_in_glass_bg],
                             "primary_wcag_ratio": prim_ratio,
                             "secondary_wcag_ratio": sec_ratio,
-                            "pass_4_5": prim_ratio >= 4.5 and sec_ratio >= 4.5,
+                            "primary_in_glass_wcag_ratio": prim_in_glass_ratio,
+                            "secondary_in_glass_wcag_ratio": sec_in_glass_ratio,
+                            "pass_4_5": (
+                                prim_ratio >= 4.5
+                                and sec_ratio >= 4.5
+                                and scrim_rgba[3] <= 0.85
+                                and 0.45 <= outer_alpha <= 0.55
+                            ),
                         }
                         contrast_results.append(record)
                         print(f"[WCAG] {page_name}_{theme}_{w}: {json.dumps(record)}")

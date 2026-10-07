@@ -298,14 +298,23 @@ def main() -> int:
             for name, path in states:
                 url = f"{BASE_URL}{path}"
                 cdp.send("Page.navigate", {"url": url})
-                # Wait for route content & triggers
-                for _ in range(25):
+                time.sleep(0.25)
+                # Wait for route content & triggers (auto-retry if upstream API transiently errors)
+                for _ in range(90):
                     ready = cdp.eval_js(
-                        "Boolean(document.querySelector('.bine-glass-trigger') || document.querySelector('h1'))"
+                        """
+                        (() => {
+                          const retryBtn = Array.from(document.querySelectorAll('button')).find(
+                            b => (b.textContent || '').trim() === 'Retry'
+                          );
+                          if (retryBtn) retryBtn.click();
+                          return Boolean(document.querySelector('.bine-glass-trigger') || document.querySelector('h1'));
+                        })()
+                        """
                     )
                     if ready and ("amount=" not in path or cdp.eval_js("Boolean(document.querySelector('.bine-glass-trigger'))")):
                         break
-                    time.sleep(0.2)
+                    time.sleep(0.25)
                 time.sleep(0.3)
 
                 cdp.eval_js(
@@ -317,7 +326,7 @@ def main() -> int:
                     """
                 )
 
-                # Open a glass panel on every route that has .bine-glass-trigger
+                # Open a glass panel on every route/state that has .bine-glass-trigger
                 cdp.eval_js(
                     """
                     (() => {
@@ -328,7 +337,7 @@ def main() -> int:
                     })()
                     """
                 )
-                time.sleep(0.3)
+                time.sleep(0.35)
 
                 if name == "guard_buy":
                     cdp.eval_js(
@@ -338,15 +347,27 @@ def main() -> int:
                           const btns = Array.from(document.querySelectorAll('button'));
                           const previewBtn = btns.find(b => (b.textContent || '').includes('Preview'));
                           if (previewBtn) previewBtn.click();
+                          if (!document.querySelector('[data-glass-panel]')) {
+                            const trigger = document.querySelector('.bine-glass-trigger');
+                            if (trigger) trigger.click();
+                          }
                         })()
                         """
                     )
                     time.sleep(1.8)
                 elif name in ("guard_refuse", "guard_below_min"):
                     cdp.eval_js(
-                        "document.querySelectorAll('details').forEach(d => d.open = true);"
+                        """
+                        (() => {
+                          document.querySelectorAll('details').forEach(d => d.open = true);
+                          if (!document.querySelector('[data-glass-panel]')) {
+                            const trigger = document.querySelector('.bine-glass-trigger');
+                            if (trigger) trigger.click();
+                          }
+                        })()
+                        """
                     )
-                    time.sleep(0.3)
+                    time.sleep(0.35)
                 elif name == "refusals":
                     cdp.eval_js(
                         """
@@ -393,10 +414,29 @@ def main() -> int:
                         time.sleep(0.2)
                     time.sleep(0.2)
 
+                # Ensure glass panel is open if any .bine-glass-trigger exists
+                if not cdp.eval_js("Boolean(document.querySelector('[data-glass-panel]'))"):
+                    cdp.eval_js(
+                        """
+                        (() => {
+                          const trigger = document.querySelector('.bine-glass-trigger');
+                          if (trigger) trigger.click();
+                        })()
+                        """
+                    )
+                    time.sleep(0.35)
+
                 scan = cdp.eval_js(SCAN_JS) or {}
                 offenders = scan.get("offenders", [])
+                glass_open = bool(scan.get("glassPanelOpen"))
+                if name != "guard_idle" and not glass_open:
+                    print(
+                        f"ERROR: [{theme}] {name} ({path}) did not have glass_open=True during underscore scan!",
+                        file=sys.stderr,
+                    )
+                    return 1
                 extra = (
-                    f"glass_open={scan.get('glassPanelOpen')} "
+                    f"glass_open={glass_open} "
                     f"text_nodes={scan.get('textNodesScanned')} "
                     f"titles={scan.get('titlesScanned')} "
                     f"aria_labels={scan.get('ariaLabelsScanned')}"

@@ -46,7 +46,7 @@ export function BineLogoTile({ size = 36, staticOnly = false }: BineLogoTileProp
   const tileRef = useRef<HTMLDivElement | null>(null)
   const reducedMotion = usePrefersReducedMotion()
   const [webGlReady, setWebGlReady] = useState<boolean>(false)
-  const [inView, setInView] = useState<boolean>(true)
+  const [inView, setInView] = useState<boolean>(false)
 
   useEffect(() => {
     setWebGlReady(checkWebGlAvailable())
@@ -54,7 +54,10 @@ export function BineLogoTile({ size = 36, staticOnly = false }: BineLogoTileProp
 
   useEffect(() => {
     const el = tileRef.current
-    if (!el || typeof IntersectionObserver === 'undefined') return
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setInView(true)
+      return
+    }
     const observer = new IntersectionObserver(
       entries => {
         const entry = entries[0]
@@ -69,8 +72,8 @@ export function BineLogoTile({ size = 36, staticOnly = false }: BineLogoTileProp
   }, [])
 
   const radius = Math.round(size * 0.24)
-  const useShader = webGlReady && !staticOnly
-  const shaderSpeed = useShader && !reducedMotion && inView ? 0.51 : 0
+  const useShader = webGlReady && (inView || reducedMotion) && !staticOnly
+  const shaderSpeed = useShader && inView && !reducedMotion ? 0.51 : 0
 
   return (
     <div

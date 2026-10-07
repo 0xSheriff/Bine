@@ -13,7 +13,7 @@ import {
 } from '../components/shared'
 import onchainReceipts from '../data/onchain-receipts.json'
 import recordedRefusals from '../data/recorded-refusals.json'
-import { GUARD_RULE_DEFINITIONS, humanizeCode, humanizeStatus } from '../lib/humanize'
+import { GUARD_RULE_DEFINITIONS, GUARD_RULES_COUNT, humanizeCode, humanizeStatus } from '../lib/humanize'
 
 const HeroArt = lazy(() =>
   import('../components/HeroArt').then(m => ({ default: m.HeroArt })),
@@ -123,7 +123,7 @@ export default function Home() {
     },
     {
       id: 'rules',
-      title: '8 deterministic pre-trade guard rules',
+      title: `${GUARD_RULES_COUNT} deterministic pre-trade guard rules`,
       subtitle: 'Evaluated sequentially on every GET /api/quote request',
       summary: (
         <div>
@@ -131,7 +131,7 @@ export default function Home() {
             Guard rules active
           </div>
           <div className="text-2xl sm:text-3xl font-semibold font-mono mt-1" style={{ color: 'var(--text)' }}>
-            8
+            {GUARD_RULES_COUNT}
           </div>
           <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
             Deterministic pre-trade checks
@@ -165,7 +165,7 @@ export default function Home() {
               onClick={e => navigateApp('/refusals', e)}
               className="bine-pill-secondary min-h-[44px] px-5 text-xs"
             >
-              See all 6 recorded refusals &rarr;
+              See all {recordedRefusals.length} recorded refusals &rarr;
             </a>
           </div>
         </div>
@@ -263,14 +263,14 @@ export default function Home() {
             For any ticker such as NVDA or SPY, Bine queries both Ondo Global Markets and bStocks contracts on BNB Smart Chain, divides raw token output by the catalog share ratio, and computes the true all-in USD price per underlying share.
           </p>
           <p className="m-0 text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-            Tie-break rule: when both issuers pass all 8 checks and their all-in share prices are within 5 bps (0.05%), Bine selects the issuer with the lower minimum order floor.
+            Tie-break rule: when both issuers pass all {GUARD_RULES_COUNT} checks and their all-in share prices are within 5 bps (0.05%), Bine selects the issuer with the lower minimum order floor.
           </p>
         </div>
       ),
     },
     {
       id: 'step-guard',
-      title: '2. Guard: 8 deterministic pre-trade safety gates',
+      title: `2. Guard: ${GUARD_RULES_COUNT} deterministic pre-trade safety gates`,
       subtitle: 'Zero silent fallbacks on thin liquidity, closed sessions, or share-ratio traps',
       summary: (
         <div className="space-y-2.5">
@@ -287,7 +287,7 @@ export default function Home() {
             <h3 className="text-base font-semibold m-0">2. Guard</h3>
           </div>
           <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Enforce 8 pre-trade safety rules covering session status, share-ratio traps, minimum order sizes, pool depth, and spread caps.
+            Enforce {GUARD_RULES_COUNT} pre-trade safety rules covering session status, share-ratio traps, minimum order sizes, pool depth, and spread caps.
           </p>
         </div>
       ),
@@ -426,7 +426,7 @@ export default function Home() {
               </div>
 
               {/* Mobile Stacked Art */}
-              <div className="md:hidden relative mt-8 -mr-6 opacity-75 pointer-events-none">
+              <div className="md:hidden relative mt-8 -mr-6 opacity-75 pointer-events-none aspect-[900/680]">
                 <Suspense fallback={null}>
                   <HeroArt />
                 </Suspense>
@@ -507,7 +507,7 @@ export default function Home() {
                     className="inline-flex items-center min-h-[44px] px-2 text-sm font-medium underline"
                     style={{ color: 'var(--text)' }}
                   >
-                    All 6 recorded refusals &rarr;
+                    All {recordedRefusals.length} recorded refusals &rarr;
                   </a>
                 </div>
               </div>

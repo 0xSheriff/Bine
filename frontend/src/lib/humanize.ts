@@ -7,18 +7,14 @@
  */
 
 export const REFUSAL_CODE_LABELS: Record<string, string> = {
-  slippage_too_high: 'Slippage too high',
+  amount_over_cap: 'Order size cap',
   below_issuer_minimum: 'Below issuer minimum',
+  market_closed: 'Trading session closed',
+  reference_stale: 'Reference price stale',
   quality_unreliable: 'Share ratio or price outlier',
   depth_thin: 'Order-book depth too thin',
-  session_closed: 'US market session closed',
-  session_paused: 'Market session paused',
-  no_supported_token: 'Ticker not in catalog',
-  over_cap: 'Exceeds trade cap',
-  quote_failed: 'Upstream quote unavailable',
-  data_stale: 'Catalog data stale',
-  rate_limited: 'Rate limit reached',
-  missing_api_keys: 'Binance API keys missing',
+  slippage_too_high: 'Slippage too high',
+  unknown_ticker: 'Ticker not in catalog',
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -41,6 +37,7 @@ export const STATUS_LABELS: Record<string, string> = {
   AFTER_HOURS: 'After hours',
   OVERNIGHT: 'Overnight session',
   amm_pools: 'AMM pools',
+  pmm_rfq_24h_volume: '24h RFQ volume',
   catalog_volume_24h: '24h catalog volume',
 };
 
@@ -105,8 +102,8 @@ export const GUARD_RULE_DEFINITIONS: Record<
 > = {
   amount_over_cap: {
     name: 'Order size cap',
-    explanation: 'Protects against oversized single orders above the quote safety limit.',
-    threshold: '> $0.00 to $2,500.00',
+    explanation: 'Protects against non-positive orders or single quotes above the $2,500.00 safety limit.',
+    threshold: '> $0.00 to <= $2,500.00',
   },
   below_issuer_minimum: {
     name: 'Issuer minimum order',
@@ -116,35 +113,41 @@ export const GUARD_RULE_DEFINITIONS: Record<
   },
   market_closed: {
     name: 'Trading session open',
-    explanation: 'Stops trades when the issuer session is paused, closed, or in transition.',
-    threshold: 'Active trading session',
+    explanation:
+      'Stops trades when openState is not true, reasonCode is not TRADING, marketStatus is paused/closed, or quote returns 40367/40369.',
+    threshold: 'openState=true & TRADING (no 40367/40369)',
   },
   reference_stale: {
     name: 'Reference price freshness',
-    explanation: 'Requires a fresh underlying stock reference price before comparing spreads.',
-    threshold: '<= 120s age',
+    explanation: 'Requires a positive reference stock price sampled within the 120-second freshness limit.',
+    threshold: '> $0.00 & <= 120s age',
   },
   quality_unreliable: {
     name: 'Token price & ratio sanity',
-    explanation: 'Filters sub-$1.00 outlier feeds and unsupported share ratios outside 0.25-5.00x.',
-    threshold: '>= $1.00 & 0.25x-5.00x ratio',
+    explanation:
+      'Requires token and reference price >= $1.00, share ratio in 0.25-5.00x (<= 1% ratio divergence), and 24h volume >= $1,000,000.',
+    threshold: '>= $1.00, 0.25-5.00x ratio, >= $1M 24h vol',
   },
   depth_thin: {
     name: 'On-chain pool depth',
-    explanation: 'Requires enough BNB Chain pool depth or 24-hour RFQ volume to fill cleanly.',
-    threshold: '>= $10K AMM depth or >= $1M 24h vol',
+    explanation:
+      'Requires a valid route plus AMM pool depth >= $10,000 and >= 10x order size (or >= $1,000,000 24h volume when RFQ-only).',
+    threshold: '>= $10K & >= 10x order AMM (or >= $1M 24h vol)',
   },
   slippage_too_high: {
     name: 'All-in slippage vs stock',
     explanation:
-      'Refuses quotes where all-in execution price exceeds the stock reference by > 1.00%.',
+      'Refuses quotes where effective slippage (max of execution spread vs reference or price impact) exceeds 1.00%.',
     threshold: '<= 1.00% (100 bps)',
   },
   unknown_ticker: {
     name: 'Verified BSC token contract',
     explanation:
-      'Only routes to verified Ondo Global Markets or bStocks contracts on BNB Chain.',
-    threshold: 'Verified BSC RWA catalog',
+      'Only routes to tickers present in the live BNB Chain (chain 56) Ondo Global Markets or bStocks RWA catalog.',
+    threshold: 'In BSC (56) Ondo / bStocks catalog',
   },
 };
+
+export const GUARD_RULES_COUNT = Object.keys(GUARD_RULE_DEFINITIONS).length;
+
 

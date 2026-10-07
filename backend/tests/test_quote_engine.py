@@ -401,12 +401,39 @@ def test_refusal_rule_market_closed(
     )
     assert ev_aaon.eligible is False
     assert ev_aaon.refusal_code == "market_closed"
-    assert ev_aaon.refusal_reason == "AAONon is in a non-trading session (postmarket). Expected to open in 0d 8h 34m. Not buying."
+    assert ev_aaon.refusal_reason == "AAONon is not accepting orders right now. Expected to reopen in about 8 hours 34 minutes. Not buying."
     verdict_aaon = build_verdict("AAON", 5.50, [ev_aaon], now=now)
     d_aaon = verdict_aaon.to_dict()
     assert d_aaon["verdict"] == "REFUSE"
     assert d_aaon["refusal"]["code"] == "market_closed"
-    assert d_aaon["refusal"]["message"] == "AAONon is in a non-trading session (postmarket). Expected to open in 0d 8h 34m. Not buying."
+    assert d_aaon["refusal"]["message"] == "AAONon is not accepting orders right now. Expected to reopen in about 8 hours 34 minutes. Not buying."
+
+    # Case C: Ondo transition pause while market_status is still "regular" and countdown is "0d 0h 0m"
+    reg_pause_sample = copy.deepcopy(ondo_sample)
+    reg_pause_sample.underlying_ticker = "ICHR"
+    reg_pause_sample.token_symbol = "ICHRon"
+    reg_pause_sample.open_state = True
+    reg_pause_sample.market_status = "regular"
+    reg_pause_sample.reason_code = "TRADING"
+    ev_reg_pause = evaluate_issuer_quote(
+        sample=reg_pause_sample,
+        amount_usd=5.50,
+        quote_response=None,
+        liquidity_response={"code": 0, "msg": "success", "data": []},
+        quote_error="[40367] Token is currently in a non-trading session. Expected to open in 0d 0h 0m.",
+        now=now,
+    )
+    assert ev_reg_pause.eligible is False
+    assert ev_reg_pause.refusal_code == "market_closed"
+    assert "(regular)" not in (ev_reg_pause.refusal_reason or "")
+    assert ev_reg_pause.refusal_reason == "ICHRon is not accepting orders right now. Expected to reopen in about less than a minute. Not buying."
+
+    # Case D: Duration humanization for 1m and multi-day
+    from bine.quote_engine import _humanize_open_duration
+    assert _humanize_open_duration("0d 0h 0m") == "less than a minute"
+    assert _humanize_open_duration("0d 0h 1m") == "1 minute"
+    assert _humanize_open_duration("0d 8h 11m") == "8 hours 11 minutes"
+    assert _humanize_open_duration("2d 13h 30m") == "2 days 13 hours 30 minutes"
 
 
 def test_refusal_rule_reference_stale(

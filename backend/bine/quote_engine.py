@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -34,6 +35,26 @@ _RWA_CATALOG_CACHE: tuple[float, datetime, list[TokenSample]] | None = None
 def clear_rwa_catalog_cache() -> None:
     global _RWA_CATALOG_CACHE
     _RWA_CATALOG_CACHE = None
+
+
+def _humanize_open_duration(raw: str) -> str:
+    clean = raw.strip().rstrip(".")
+    m = re.fullmatch(r"(?:(\d+)\s*d)?\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?", clean, flags=re.IGNORECASE)
+    if not m or not any(m.groups()):
+        return clean
+    days = int(m.group(1) or 0)
+    hours = int(m.group(2) or 0)
+    minutes = int(m.group(3) or 0)
+    if days == 0 and hours == 0 and minutes == 0:
+        return "less than a minute"
+    parts: list[str] = []
+    if days > 0:
+        parts.append("1 day" if days == 1 else f"{days} days")
+    if hours > 0:
+        parts.append("1 hour" if hours == 1 else f"{hours} hours")
+    if minutes > 0:
+        parts.append("1 minute" if minutes == 1 else f"{minutes} minutes")
+    return " ".join(parts)
 
 
 def _safe_float(val: Any) -> float | None:
@@ -430,14 +451,14 @@ def evaluate_issuer_quote(
         or sample.market_status in ("paused", "closed")
     )
     if market_closed:
-        if is_40367_or_40369:
-            session_label = sample.market_status or sample.reason_code or "closed"
+        if is_40367_or_40369 or sample.market_status == "regular":
             open_note = ""
             if "Expected to open in " in quote_err_str:
                 open_part = quote_err_str.split("Expected to open in ", 1)[1].strip().rstrip(".")
                 if open_part:
-                    open_note = f" Expected to open in {open_part}."
-            market_msg = f"{sample.token_symbol} is in a non-trading session ({session_label}).{open_note} Not buying."
+                    humanized = _humanize_open_duration(open_part)
+                    open_note = f" Expected to reopen in about {humanized}."
+            market_msg = f"{sample.token_symbol} is not accepting orders right now.{open_note} Not buying."
         else:
             market_msg = (
                 f"{short_issuer} trading for {sample.token_symbol} is currently {sample.market_status or 'closed'} ({sample.reason_code or 'session paused'}). Not buying while the session is paused or closed."

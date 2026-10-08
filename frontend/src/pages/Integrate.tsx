@@ -8,6 +8,16 @@ import type { QuoteVerdictResponse } from '../types'
 
 const DEFAULT_API_URL = 'http://localhost:8000'
 
+function getHttpApiUrl(): string {
+  if (typeof window !== 'undefined' && window.location.origin) {
+    if (import.meta.env.DEV && ['5173', '5174'].includes(window.location.port)) {
+      return DEFAULT_API_URL
+    }
+    return window.location.origin
+  }
+  return DEFAULT_API_URL
+}
+
 interface IntegrationTab {
   id: 'http' | 'cli' | 'mcp' | 'skill'
   label: string
@@ -16,53 +26,55 @@ interface IntegrationTab {
   code: string
 }
 
-const INTEGRATION_TABS: IntegrationTab[] = [
-  {
-    id: 'http',
-    label: 'HTTP',
-    title: 'GET /api/quote (frozen schema version 1)',
-    description:
-      'Call /api/quote before any tokenized stock purchase. Check the verdict ("BUY" or "REFUSE") and token contract address before building swap calldata.',
-    code: `curl -s "${DEFAULT_API_URL}/api/quote?ticker=NVDA&amount_usd=5.50" | jq .`,
-  },
-  {
-    id: 'cli',
-    label: 'CLI',
-    title: 'bine CLI (human & shell script entry point)',
-    description:
-      'Install the backend package in editable mode and run bine check for a pre-trade verdict or bine buy to run the Transaction API dry-run pipeline.',
-    code: `pip install -e backend\nbine check NVDA 5.50\nbine check SPYon 250 --json\nbine buy NVDA 2.00`,
-  },
-  {
-    id: 'mcp',
-    label: 'MCP',
-    title: 'Model Context Protocol server (stdio)',
-    description:
-      'Expose the Bine check and buy tools to Claude Desktop, Cursor, or any Model Context Protocol host.',
-    code: JSON.stringify(
-      {
-        mcpServers: {
-          'bine-pre-trade-guard': {
-            command: 'bine-mcp',
-            env: {
-              BINE_API_URL: DEFAULT_API_URL,
+function buildIntegrationTabs(httpApiUrl: string): IntegrationTab[] {
+  return [
+    {
+      id: 'http',
+      label: 'HTTP',
+      title: 'GET /api/quote (frozen schema version 1)',
+      description:
+        'Call /api/quote before any tokenized stock purchase. Check the verdict ("BUY" or "REFUSE") and token contract address before building swap calldata.',
+      code: `curl -s "${httpApiUrl}/api/quote?ticker=NVDA&amount_usd=5.50" | jq .`,
+    },
+    {
+      id: 'cli',
+      label: 'CLI',
+      title: 'bine CLI (human & shell script entry point)',
+      description:
+        'Install the backend package in editable mode and run bine check for a pre-trade verdict or bine buy to run the Transaction API dry-run pipeline.',
+      code: `pip install -e backend\nbine check NVDA 5.50\nbine check SPYon 250 --json\nbine buy NVDA 2.00`,
+    },
+    {
+      id: 'mcp',
+      label: 'MCP',
+      title: 'Model Context Protocol server (stdio)',
+      description:
+        'Expose the Bine check and buy tools to Claude Desktop, Cursor, or any Model Context Protocol host.',
+      code: JSON.stringify(
+        {
+          mcpServers: {
+            'bine-pre-trade-guard': {
+              command: 'bine-mcp',
+              env: {
+                BINE_API_URL: DEFAULT_API_URL,
+              },
             },
           },
         },
-      },
-      null,
-      2,
-    ),
-  },
-  {
-    id: 'skill',
-    label: 'Agent skill',
-    title: 'Binance Agentic Wallet skill (SKILL.md)',
-    description:
-      'Install the skill file so autonomous agents using @binance/agentic-wallet (baw) always run bine check and verify the token address before baw market-order swap.',
-    code: `mkdir -p ~/.claude/skills/bine-pre-trade-guard && cp skills/bine-pre-trade-guard/SKILL.md ~/.claude/skills/bine-pre-trade-guard/SKILL.md`,
-  },
-]
+        null,
+        2,
+      ),
+    },
+    {
+      id: 'skill',
+      label: 'Agent skill',
+      title: 'Binance Agentic Wallet skill (SKILL.md)',
+      description:
+        'Install the skill file so autonomous agents using @binance/agentic-wallet (baw) always run bine check and verify the token address before baw market-order swap.',
+      code: `mkdir -p ~/.claude/skills/bine-pre-trade-guard && cp skills/bine-pre-trade-guard/SKILL.md ~/.claude/skills/bine-pre-trade-guard/SKILL.md`,
+    },
+  ]
+}
 
 export const RESPONSE_FIELDS = [
   {
@@ -166,7 +178,7 @@ const ERROR_ROWS = [
   },
   {
     status: '429',
-    meaning: 'Per-IP sliding-window rate limit exceeded (60 req/min on /api/quote, 20 req/min on /api/execute).',
+    meaning: 'Per-IP sliding-window rate limit exceeded (20 req/min on /api/quote, 20 req/min on /api/execute).',
     action: 'Wait for the window to reset and reuse quotes within the 15-second freshness window.',
   },
   {
@@ -188,6 +200,7 @@ export default function Integrate() {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const fieldTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
+  const INTEGRATION_TABS = buildIntegrationTabs(getHttpApiUrl())
   const activeTab = INTEGRATION_TABS[activeIndex]
   const activeField = RESPONSE_FIELDS.find(f => f.key === openFieldKey) ?? null
   const activeFieldTriggerRef = {

@@ -337,7 +337,9 @@ export default function Guard() {
     if (!submittedQuery) return
     const origin =
       typeof window !== 'undefined' && window.location.origin
-        ? window.location.origin.replace(':5174', ':8000').replace(':5173', ':8000')
+        ? import.meta.env.DEV
+          ? window.location.origin.replace(':5174', ':8000').replace(':5173', ':8000')
+          : window.location.origin
         : 'http://localhost:8000'
     const cmd = `curl -s "${origin}/api/quote?ticker=${encodeURIComponent(submittedQuery.ticker)}&amount_usd=${submittedQuery.amount}" | jq .`
     try {
@@ -368,11 +370,15 @@ export default function Guard() {
     }
     return {
       kind: 'network' as const,
-      title: 'Check that the backend is running on port 8000',
+      title: import.meta.env.DEV
+        ? 'Check that the backend is running on port 8000'
+        : 'Could not reach the quote service',
       detail:
         quoteError instanceof Error
           ? quoteError.message
-          : 'Could not reach the Bine backend on port 8000.',
+          : import.meta.env.DEV
+            ? 'Could not reach the Bine backend on port 8000.'
+            : 'Could not reach /api/quote.',
     }
   }, [quoteError])
 
@@ -832,7 +838,9 @@ export default function Guard() {
                       <p className="text-sm m-0" style={{ color: 'var(--text-secondary)' }}>
                         {errorInfo.kind === '503'
                           ? 'The backend could not authenticate with the Binance Web3 RWA API. Configure your keys in .env and restart the backend.'
-                          : 'Make sure the FastAPI server is running on http://localhost:8000 and reachable from your browser.'}
+                          : import.meta.env.DEV
+                            ? 'Make sure the FastAPI server is running on http://localhost:8000 and reachable from your browser.'
+                            : 'Could not reach /api/quote. Check your connection and retry in a moment.'}
                       </p>
                     </div>
 

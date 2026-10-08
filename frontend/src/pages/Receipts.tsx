@@ -277,7 +277,7 @@ export default function Receipts() {
                             {row.filled_shares !== null && row.quoted_shares !== null ? (
                               <>
                                 {' '}
-                                · {row.filled_shares.toFixed(6)} filled vs {row.quoted_shares.toFixed(6)} quoted (
+                                · {row.filled_shares.toFixed(6)} shares filled vs {row.quoted_shares.toFixed(6)} shares quoted (
                                 {row.fill_diff_bps !== null && row.fill_diff_bps > 0 ? '+' : ''}
                                 {row.fill_diff_bps} bps)
                               </>
@@ -334,11 +334,13 @@ export default function Receipts() {
                               Shares filled vs quoted
                             </div>
                             <div className="text-sm font-mono font-semibold mt-1">
-                              {row.filled_shares !== null ? row.filled_shares.toFixed(6) : 'N/A'} /{' '}
-                              {row.quoted_shares !== null ? row.quoted_shares.toFixed(6) : 'N/A'}
+                              {row.filled_shares !== null ? `${row.filled_shares.toFixed(6)} sh` : 'N/A'} /{' '}
+                              {row.quoted_shares !== null ? `${row.quoted_shares.toFixed(6)} sh` : 'N/A'}
                             </div>
                             <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                              {row.fill_diff_bps !== null ? `${row.fill_diff_bps} bps difference` : 'Exact match'}
+                              {row.fill_diff_bps !== null
+                                ? `${row.fill_diff_bps > 0 ? '+' : ''}${row.fill_diff_bps} bps difference`
+                                : 'Exact match'}
                             </div>
                           </div>
 

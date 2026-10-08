@@ -202,7 +202,7 @@ export default function Home() {
                   <span>Block #{r.block_number}</span>
                 </div>
                 <div style={{ color: 'var(--text-secondary)' }}>
-                  Filled {r.filled_shares.toFixed(6)} vs {r.quoted_shares.toFixed(6)} quoted ({r.fill_diff_bps} bps) · Gas {r.gas_bnb.toFixed(8)} BNB
+                  Filled {r.filled_shares.toFixed(6)} shares vs {r.quoted_shares.toFixed(6)} shares quoted ({r.fill_diff_bps > 0 ? '+' : ''}{r.fill_diff_bps} bps) · Gas {r.gas_bnb.toFixed(8)} BNB
                 </div>
                 <div className="font-mono">
                   <a
@@ -532,7 +532,7 @@ export default function Home() {
                   <p className="text-sm sm:text-base font-medium m-0 leading-relaxed" style={{ color: 'var(--text)' }}>
                     Swapped ${LATEST_RECEIPT.amount_usd.toFixed(2)} USDT for {LATEST_RECEIPT.filled_shares.toFixed(6)}{' '}
                     {LATEST_RECEIPT.symbol} shares (quoted {LATEST_RECEIPT.quoted_shares.toFixed(6)} shares,{' '}
-                    {LATEST_RECEIPT.fill_diff_bps} bps difference) at ${LATEST_RECEIPT.all_in_price_per_share_usd.toFixed(2)}/sh.{' '}
+                    {LATEST_RECEIPT.fill_diff_bps > 0 ? '+' : ''}{LATEST_RECEIPT.fill_diff_bps} bps difference) at ${LATEST_RECEIPT.all_in_price_per_share_usd.toFixed(2)}/sh.{' '}
                     {LATEST_RECEIPT.execution_source}.
                   </p>
                 </div>

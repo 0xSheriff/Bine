@@ -18,3 +18,8 @@ node_modules/
 wallet_*.json
 *.secret
 .DS_Store
+.vitepress/cache/
+.vitepress/dist/
+docs-site/.vitepress/cache/
+docs-site/.vitepress/dist/
+docs-site/node_modules/

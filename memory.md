@@ -1,4 +1,4 @@
-# BINE — AI Context & Handoff Memory
+# BINE - AI Context & Handoff Memory
 
 ## 1. Project Overview
 - **What it is**: BINE is a **pre-trade guard for tokenized stocks on BNB Smart Chain (`chainId="56"`)**. Before a person or an agent buys a tokenized stock, Bine answers: *is it safe right now, what will I really get, and if not, why not.*
@@ -53,54 +53,54 @@
       - `PHASE F`: Created `scripts/verify_rules_truth_table.py` extracting all 8 backend refusal codes and threshold constants (`backend/bine/quote_engine.py`, `backend/bine/quality.py`) and verifying `8/8` `MATCH` rows (`MISMATCH_ROWS=0`) against `GUARD_RULE_DEFINITIONS` and the rendered DOM on `/refusals` and `/guard`; derived all rule and refusal counts from data (`GUARD_RULES_COUNT`, `recordedRefusals.length = 7`, `0` hard-coded count strings); mounted `<BineGlassFilterDef />` only while a glass panel is open (`GlassStack.tsx`), gated offscreen `BineLogoTile` WebGL shader initialization via `inView || reducedMotion`, and reserved `aspect-[900/680]` on mobile `<HeroArt />` so 3-run median Fair Lighthouse (`vite preview` on `:4173` for `7fd9564` vs `:4174` for `HEAD`) achieved exact parity on `/` (`75` vs `75`, CLS improved from `0.0948` to `0.0400`) and `+1` point on `/guard?ticker=NVDA&amount=5.5` (`82` vs `81`, TBT `536 ms` vs `546 ms`); tinted outer `.bine-glass-panel` at `0.50` and inner contrast plate `.bine-glass-scrim` at `0.82` (`<= 0.85`), verifying `>= 5.84:1` (plate alone) and `>= 6.89:1` (plate in glass) WCAG contrast and capturing before/after `1440px` screenshots; extended `scripts/check_underscores.py` so `guard_refuse` and `guard_below_min` open a glass panel (`glass_open=True`, `TOTAL_UNDERSCORE_OFFENDERS=0`); verified `0px` logo `x` drift and `0.0000/255` pixel diff (`scripts/verify_logo_and_alignment.py`); and added `"Derive counts from data, never hard-code them"` to `.agents/skills/bine-ui-standing-rules/SKILL.md`.
 
 ## 5. Recent Changes
-- **2026-10-02 (Item 1 — State Check & Dead Code Trim)**:
+- **2026-10-02 (Item 1 - State Check & Dead Code Trim)**:
   - Verified `48/48` `pytest -v` tests pass and `npm run build` succeeds (`274ms`, 0 TypeScript errors).
   - Removed dead legacy files (`backend/bine/sampler.py`, `backend/bine/schemas.py`, `docs/deploy-always-on.md`, `frontend/src/pages/Evidence.tsx`, `frontend/src/pages/Compare.tsx`, `frontend/src/pages/WeekendGap.tsx`, `frontend/src/pages/TokenDetail.tsx`, `frontend/src/pages/Agent.tsx`, `frontend/src/pages/HowItWorks.tsx`).
   - Added new rebuild files: `backend/bine/cli.py` (242 lines), `backend/bine/mcp_server.py` (204 lines), `tools/collect_evidence.py`, `skills/bine-pre-trade-guard/SKILL.md`, `docs/optional-hosting.md`, `docs/devex-facts.md`.
   - Trimmed `backend/bine/quote_engine.py` from `1,014` lines (697 pre-rebuild baseline) down to `657` lines and `frontend/src/pages/Home.tsx` from `1,035` lines (baseline) down to `625` lines (`3,982` total lines across all `backend/bine/*.py` + `frontend/src/pages/*.tsx`).
-- **2026-10-02 (Item 2 — Clean Install in `/tmp/v`)**:
+- **2026-10-02 (Item 2 - Clean Install in `/tmp/v`)**:
   - Updated `backend/pyproject.toml` `[project.scripts]` with `bine = "bine.cli:main"` and `bine-mcp = "bine.mcp_server:main"`.
   - Verified in fresh `/tmp/v` venv (`/tmp/v/bin/pip install -e backend`) that `/tmp/v/bin/bine check NVDA 5` and `/tmp/v/bin/bine-mcp` (`tools/list`) execute with zero manual edits.
-- **2026-10-02 (Item 3 — Screenshot Hooks Removed from Production Build)**:
+- **2026-10-02 (Item 3 - Screenshot Hooks Removed from Production Build)**:
   - Removed `ss`, `vw`, and `dry_run` query params from `frontend/src/pages/Home.tsx` and gated `receipt` strictly inside `if (import.meta.env.DEV)`.
   - Verified via `npm run build` and `grep -oE '"(ss|vw|receipt|dry_run)"' dist/assets/*.js` that zero test hooks appear in the production bundle (`dist/assets/index-CO_HJepa.js`).
-- **2026-10-02 (Item 4 — `priceImpactPercent` Scale Verified & Documented)**:
+- **2026-10-02 (Item 4 - `priceImpactPercent` Scale Verified & Documented)**:
   - Verified `_parse_price_impact_pct()` in `backend/bine/quote_engine.py` converts the `0–1` fractional string (`"0.2974289557"`) into `29.7429%` (`0–100` scale).
   - Updated `docs/friction-log.md` and `docs/devex-facts.md` (item 9) to explain that `priceImpactPercent` is a `0–1` fraction (`29.74%` output drop, matching the ~29.1% share reduction from `$100` to `$250` on `SPYon`) mislabeled as `Percent`, and removed any claim that it understates.
-- **2026-10-02 (Item 5 — Execution Path, Async Order Polling, & Indicative Ondo Label)**:
+- **2026-10-02 (Item 5 - Execution Path, Async Order Polling, & Indicative Ondo Label)**:
   - Verified `run_agentic_wallet_swap()` in `backend/bine/execution.py` polls `baw market-order list --orderId <id> --json` and handles `FINISHED` (`txHash` -> `LIVE_SUBMITTED`), `FAILED` (`LIVE_ERROR`), and polling timeout (`LIVE_TIMEOUT`). Added `test_baw_async_order_polling_finished_failed_and_timeout` (`49/49` pytest tests pass).
   - Documented per-issuer `baw` routing in `docs/devex-facts.md` (`bstock` -> `/web-dex/agent/place-order`, `ondo` -> `/web-dex/ondo/place-order`) and labeled Ondo aggregator quotes as indicative in `frontend/src/pages/Home.tsx` and `backend/bine/quote_engine.py`.
-- **2026-10-02 (Item 6 — Safety Gates & Secret Scan Verified)**:
+- **2026-10-02 (Item 6 - Safety Gates & Secret Scan Verified)**:
   - Verified constant-time `hmac.compare_digest` check for `BINE_ADMIN_TOKEN` gating `execute_live=true` in `backend/bine/app.py` (lines 472–480) and `backend/bine/execution.py` (lines 575–587), sliding-window per-IP rate limiting (`60/min` on `/api/quote`, `20/min` on `/api/execute`), restricted CORS (`GET, POST` and `Content-Type, X-Bine-Admin-Token`), and `BINE_LIVE_MODE=false` in `docs/optional-hosting.md`.
   - Confirmed `git check-ignore -v .env` matches `Bine/.gitignore:1:.env` and verified `0` occurrences of `BINANCE_API_KEY` or `BINANCE_SECRET_KEY` across the working tree and git commit history.
-- **2026-10-02 (Item 7 — UI Verification & Cold-Load Latency)**:
+- **2026-10-02 (Item 7 - UI Verification & Cold-Load Latency)**:
   - Fixed `quote_stock()` in `backend/bine/app.py` so `GET /api/quote?details=true` preserves the optional `details.issuers` payload while keeping `QuoteResponseModel` on `/docs`.
   - Captured and visually inspected 24 screenshots across `BUY` (`NVDA` `$5`), `REFUSE` (`AAPL` `$2` and `SPYon` `$250`), and the `Confirm` dry-run panel in Light and Dark themes at `390px`, `768px`, and `1440px` using Chrome DevTools `Emulation.setDeviceMetricsOverride`.
   - Measured cold-load latency (`/rwa/tokens` cache cold + 2 live `/aggregator/quote` + 2 `/top-liquidity` calls) at `3.244s`, warm-catalog live quote latency at `0.931s–1.306s`, and warm 15s quote-cache latency at `1.2ms`.
-- **2026-10-02 (Item 8 — Final Judge Test Re-Score)**:
+- **2026-10-02 (Item 8 - Final Judge Test Re-Score)**:
   - Re-scored all 12 categories with concrete file/test/screenshot/command evidence (`11/12` categories passing at `9/10–10/10`; `Live On-Chain Execution` explicitly marked `0/10 (UNVERIFIED)` until the user runs the live `$2`/`$5` swap commands).
-- **2026-10-03 (Item A.1 — Standalone Git Repo & Staged Secret Scan)**:
+- **2026-10-03 (Item A.1 - Standalone Git Repo & Staged Secret Scan)**:
   - Initialized a dedicated git repository inside the project root (`git init`), confirmed `git check-ignore -v .env` -> `.gitignore:1:.env	.env`, scanned all staged files for `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` (`staged_key_matches=0`, `staged_secret_matches=0`), and created root commit `1a6e1d1`.
-- **2026-10-03 (Item A.2 — `baw` Command Flags & `npx` Fallback)**:
+- **2026-10-03 (Item A.2 - `baw` Command Flags & `npx` Fallback)**:
   - Verified `npx --yes @binance/agentic-wallet@1.10.0 market-order swap --help`: uses `--fromTokenQty`, `--fromToken`, `--toToken`, `--binanceChainId 56`, `--slippage` (`"auto"` or `0–100` percentage points, e.g. `0.5` = `0.5%`), `--mev true`, `--gasLevel MEDIUM`, `--json`.
   - Updated `run_agentic_wallet_swap()` in `backend/bine/execution.py` to fall back to `npx --yes @binance/agentic-wallet@1.10.0` when `baw` is not installed globally on `PATH`.
-- **2026-10-03 (Item A.3 — `$5.50` Default Amount & Plain-English Minimum Copy)**:
+- **2026-10-03 (Item A.3 - `$5.50` Default Amount & Plain-English Minimum Copy)**:
   - Set default order amount to `$5.50` across UI, CLI help, MCP descriptions, `app.py`, `SKILL.md`, and `README.md`.
   - Updated `below_issuer_minimum` message in `backend/bine/quote_engine.py` to `"Ondo's minimum order is $5. After conversion your $5.00 lands just under it. Try $5.50."` and documented the `5.00` vs `5.05` `[40375]` test in `docs/devex-facts.md` (`UNVERIFIED` internal cause since `data` is `null` on `40375`).
-- **2026-10-03 (Item A.4 — Local `BINE_API_URL` Default for CLI & MCP)**:
+- **2026-10-03 (Item A.4 - Local `BINE_API_URL` Default for CLI & MCP)**:
   - Updated `backend/bine/config.py` (`bine_api_url = "http://localhost:8000"`), `backend/bine/cli.py`, and `backend/bine/mcp_server.py` so `bine` and `bine-mcp` default `BINE_API_URL` to `http://localhost:8000` and print a single clear line showing how to start `uvicorn bine.app:app --app-dir backend --port 8000` when the backend is unreachable.
-- **2026-10-03 (Item A.5 — Remove `apscheduler` and `test_sampler.py`)**:
+- **2026-10-03 (Item A.5 - Remove `apscheduler` and `test_sampler.py`)**:
   - Removed `apscheduler>=3.10` from `backend/pyproject.toml`, removed `bine_sample_interval_minutes` from `backend/bine/config.py`, deleted `backend/tests/test_sampler.py`, and updated `tools/collect_evidence.py` to use a plain `asyncio.sleep` loop with zero `apscheduler` dependency.
-- **2026-10-03 (Item B — Four Routes `/`, `/integrate`, `/refusals`, `/receipts` & SPA Fallback)**:
+- **2026-10-03 (Item B - Four Routes `/`, `/integrate`, `/refusals`, `/receipts` & SPA Fallback)**:
   - Updated `TopHeader` in `frontend/src/components/shared.tsx` with wordmark, 4-route nav (`Guard`, `Integrate`, `Refusals`, `Receipts`), and theme toggle.
   - Added `frontend/src/pages/Integrate.tsx` (123 lines), `frontend/src/pages/Refusals.tsx` (122 lines, live API calls for `AAPL $2`, `SPYon $250`, `ENLV $5.50`, catalog share-ratio trap `KLAC`, and catalog session-closed token `ICHR`), and `frontend/src/pages/Receipts.tsx` (79 lines, `live_only=true` filtering rows with `tx_hash`).
   - Added SPA static file and deep-link fallback route in `backend/bine/app.py`. Gzip bundle grew by only `3.18 kB` (`101.34 kB -> 104.52 kB`).
-- **2026-10-03 (Item C — Root `README.md`)**:
+- **2026-10-03 (Item C - Root `README.md`)**:
   - Created `README.md` with one-sentence product definition, "Run it in 3 commands" quickstart (requiring `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` in `.env`), local URL (`http://localhost:8000`), HTTP API / CLI / MCP / Wallet Skill usage, screenshot index, and safety defaults.
-- **2026-10-03 (Item A.6 — Re-capture & Inspect All 24 Screenshots)**:
+- **2026-10-03 (Item A.6 - Re-capture & Inspect All 24 Screenshots)**:
   - Re-captured all 24 screenshots (`BUY NVDA $5.50`, `REFUSE AAPL $2`, `REFUSE SPYon $250`, and `Confirm` dry-run panel at `390px`, `768px`, and `1440px` in Light and Dark themes) on the current 4-route build (`dist/assets/index-B71wR5wL.js`).
   - Opened and inspected all 24 PNGs via `view_file`: confirmed `ui_confirm_light_1440.png` and all 5 other `ui_confirm_*` screenshots render the expanded `SIMULATION PASSED` panel (`Decision #9–#14`), all `768px` and `1440px` screenshots render the updated `Details` bar (`2 issuers · market offhours` / `1 issuer · market offhours`), and all 24 screenshots show the 4-route header (`Bine | Guard Integrate Refusals Receipts`) and `$5.50` default with zero defects.
-- **2026-10-03 (Item D — 12-Category Re-Score)**:
+- **2026-10-03 (Item D - 12-Category Re-Score)**:
   - Completed the 12-category evaluation (`minimalism`, `real-world usefulness`, `immediate usability`, `plug and play`, `technical execution`, `originality`, `UX`, `visual quality`, `demonstration potential`, `hackathon differentiation`, `clarity`, `technical story`) with concrete file, test, command, and screenshot evidence (`Overall: 9.0/10` before live swap, `9.5/10` after live `$2 NVDAB` swap verification).
 - **2026-10-03 (Live `$2.00` `NVDAB` Swap Verification & Dynamic `--toToken` Generator Fix)**:
   - Added `build_baw_swap_command_from_quote(quote, expected_address=...)` in `backend/bine/execution.py` and wired it into `execute_trade_pipeline()`, `run_agentic_wallet_swap()`, and `backend/bine/cli.py` (`bine check --baw` and `bine buy`) so `--toToken` is always read directly from `quote["token"]["address"]` (`0x02fca66c1d1afb4e2a7884261eb00f63598a7436` for `NVDAB`) and verified character-by-character before any swap.
@@ -114,7 +114,7 @@
   - Ran the US regular-hours quote matrix (`2026-10-05T15:04Z`, `marketStatus = "regular"`, 94 minutes after open / `11:04` New York, saved to `docs/raw/regular_hours_quotes_2026-10-05.jsonl`) and executed the second live `$2.00` `NVDAB` swap (`bine buy NVDA 2 --yes`) with zero hand edits (`DecisionLog #17` dry-run + `DecisionLog #18` live execution, `orderId: 26100500001942767719`, `txHash: 0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75`, BSC Block `125889084`, `docs/live_swap_nvda_2usd_second_2026-10-05.json`).
   - Verified on-chain USDT allowances (`docs/raw/usdt_allowance_2026-10-05.txt`): `allowance(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730, 0xb300000b72DEAEb607a12d5f54773D1C19c7028d)` is `uint256.max - 4 * 10^18` while `allowance(..., 0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5)` is `0`. Updated `run_transaction_dry_run()` in `backend/bine/execution.py` to check `allowance(wallet, 0xb300...)` via BSC RPC when a wallet address is configured (`51/51` pytest tests passing), and created `docs/devex-report-facts.md`.
 - **2026-10-06 (Copy-and-Logic Cleanup, DevEx Report Map, & `ui-redesign` Branch)**:
-  - **Items 1–4 & A–D on `master`**: Updated `REQUIRES_APPROVAL` display label + tooltip, separated `quality_unreliable` vs `market_closed` (`[40367]`/`[40369]`) vs `depth_thin` (`[40374]`), refined share-ratio and negative-spread `slippage_too_high` messages, removed em dashes (`—`), and created `docs/devex-report-map.md`.
+  - **Items 1–4 & A–D on `master`**: Updated `REQUIRES_APPROVAL` display label + tooltip, separated `quality_unreliable` vs `market_closed` (`[40367]`/`[40369]`) vs `depth_thin` (`[40374]`), refined share-ratio and negative-spread `slippage_too_high` messages, removed em dashes (`-`), and created `docs/devex-report-map.md`.
   - **`ui-redesign` Branch (Skin-Only Frontend Redesign)**:
     - Added `@fontsource-variable/inter` (bundled, removed external Google Fonts links from `frontend/index.html`), `motion` (`motion/react`), and `@paper-design/shaders-react` (`LiquidMetal`).
     - Created `frontend/src/assets/bine-mark.svg`, `frontend/src/assets/bine-mark.png` (`512x512` transparent-background white `B` mask), `frontend/public/favicon.svg`, and `frontend/src/components/BineLogo.tsx` (`BineLogoTile` + `BineWordmarkLockup` with `LiquidMetal`, `IntersectionObserver` offscreen pause, and WebGL/reduced-motion CSS fallback).
@@ -143,52 +143,56 @@
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
 ## 8. Current Task
-- Completed both the 7-phase frontend refinement pass (`PHASE 0`–`PHASE 6`), the 6-phase polish & verification pass (`PHASE A`–`PHASE F`), and the verified DevEx evidence ledger (`docs/devex-evidence.md`) on branch `ui-redesign`.
+- Completed Phases 0-7 on branch `deploy-prep` (cut from `master` at `fd9b043`) and running Phase 8 end-to-end verification before handoff (no push, no merge, no Vercel deploy).
 
 ## 9. Next Steps
-1. Review `ui-redesign` branch in browser at `http://localhost:5174` and merge to `master` when approved by user.
+1. User reviews `deploy-prep` branch, merges/pushes to GitHub (`kyrian-dev/Bine`), imports into Vercel with read-only `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` in `fra1`, and fills in the two `README.md` / `docs-site/index.md` TODOs (`Live demo` URL and `Demo video` link).
 
 ## 10. Important Files
-- `memory.md` — Primary AI context and handoff state.
-- `README.md` — Root documentation (`For judges` section, 3-command quickstart, and safety defaults).
-- `docs/devex-evidence.md` — Line-sourced, zero-prose evidence ledger (`VERIFIED` vs `AGENT-REPORTED`) covering all endpoints, `llms.txt`/`llms-full.txt` vs SPA docs, RWA Data schemas, verbatim errors, latencies, rate limits, and all recorded quotes.
-- `docs/raw/endpoint_latency_15_runs_2026-10-07.jsonl` — Raw 15-call sequential read-only latency measurements (`3s` apart) across `/rwa/tokens` (`ondo` & `bstock`), `/token/top-liquidity`, and `/aggregator/quote`.
-- `docs/ui-audit.md` — Phase 0 baseline, Phase 5 post-refinement, and Phase C–F liquid-glass, Fair Lighthouse, and sRGB WCAG plate-contrast audit.
-- `docs/ui-design-rules.md` — Frontend design rules, tokens, typography, and component patterns.
-- `.agents/skills/bine-ui-standing-rules/SKILL.md` — Workspace skill enforcing the 5 standing frontend UI and verification rules.
-- `scripts/verify_rules_truth_table.py` — Automated 3-column rules truth table and data-driven count verifier.
-- `scripts/check_underscores.py` — Automated CDP underscore scanner across all routes/themes/states.
-- `scripts/verify_logo_and_alignment.py` — Automated CDP logo `x`-coordinate and pixel-diff verifier.
-- `scripts/verify_glass_and_perf.py` — Automated CDP liquid-glass screenshot, sRGB pixel contrast, overflow, and performance trace verifier.
-- `docs/PROJECT_BRIEF.md` — Original brief.
-- `docs/friction-log.md` — Empirical friction log with raw API measurements.
-- `docs/devex-facts.md` — Raw verified DevEx facts (Phase 8).
-- `docs/devex-report-facts.md` — Concise bullet fact sheet of all DevEx findings.
-- `docs/devex-report-map.md` — Form-aligned Developer Experience Report mapping table.
-- `docs/optional-hosting.md` — Optional single-service hosting guide (Phase 2).
-- `docs/dry_run_nvda_2usd.json` — Saved Transaction API dry-run output before live swap.
-- `docs/live_swap_nvda_2usd.json` — Saved first `$2.00` `NVDAB` live swap receipt (`Decision #16`).
-- `docs/live_swap_nvda_2usd_second_2026-10-05.json` — Saved second `$2.00` `NVDAB` live swap receipt (`Decision #18`, zero hand edits).
-- `tools/collect_evidence.py` — Standalone evidence sampler utility.
-- `backend/bine/client.py` — `BinanceClient` + `maybe_enable_dev_dns_fallback`.
-- `backend/bine/quality.py` — Data-quality filter (`assess_token_quality`, `MAX_SHARE_RATIO = 5.0`).
-- `backend/bine/quote_engine.py` — Live `/rwa/tokens` 60s cache + deterministic pre-trade guard (`schema_version: "1"`).
-- `backend/bine/execution.py` — Transaction API `/simulate` dry-run + `BINE_ADMIN_TOKEN` + `baw` (`npx` fallback) execution.
-- `backend/bine/cli.py` — `bine check` and `bine buy` CLI entry point (defaults to `BINE_API_URL=http://localhost:8000`).
-- `backend/bine/mcp_server.py` — Stdio MCP server (`bine_check`, `bine_buy`).
-- `skills/bine-pre-trade-guard/SKILL.md` — Wallet Skill for Binance Agentic Wallet.
-- `frontend/src/lib/humanize.ts` — Plain-English formatter for refusal codes, statuses, depth sources, field keys, and `GUARD_RULE_DEFINITIONS`.
-- `frontend/src/components/BineLogo.tsx` — `LiquidMetal` shader logo tile + wordmark lockup with monochrome chrome fallback and frozen `speed={0}` reduced-motion support.
-- `frontend/src/components/GlassStack.tsx` — `BineGlassFilterDef`, `GlassDetailPanel`, and `GlassStack` liquid-glass interactive card system.
-- `frontend/src/components/HeroArt.tsx` — 2D SVG lavender ring + 3D gold coin with `offset-path` roll and pointer parallax.
-- `frontend/src/components/shared.tsx` — `TopHeader` (`80px` nav bar, `LiveModeChip`, route-change `<h1>` focus) and `Footer` (`Connect` social pills).
-- `frontend/src/pages/Home.tsx` — `/` 2.5-screen Landing page with interactive glass proof strip and how-it-works cards.
-- `frontend/src/pages/Guard.tsx` — `/guard` Interactive Pre-Trade Guard with WAI-ARIA APG combobox, glass metric tiles, and glass guard-rule checks.
-- `frontend/src/pages/Refusals.tsx` — `/refusals` 8-rule interactive glass table, 7 recorded refusal glass cards, and one-at-a-time live runner.
-- `frontend/src/pages/Receipts.tsx` — `/receipts` verified on-chain receipts with expandable liquid-glass verification details.
-- `frontend/src/pages/Integrate.tsx` — `/integrate` WAI-ARIA APG tabbed reference (`HTTP`, `CLI`, `MCP`, `Agent skill`), live `"Try it"` runner, and interactive glass response field table.
-- `frontend/src/data/recorded-refusals.json` — Recorded Oct 5 regular-hours and overnight refusal samples with verified provenance.
-- `frontend/src/data/onchain-receipts.json` — Verified BNB Chain swap receipts (`Decision #16` and `Decision #18`).
+- `memory.md` - Primary AI context and handoff state.
+- `README.md` - 30-second non-technical overview with verified checks, BscScan links, and 3-command quickstart.
+- `vercel.json` - Vercel Services configuration (`services.backend` FastAPI in `fra1`, `services.frontend` Vite SPA).
+- `backend/main.py` & `backend/requirements.txt` - FastAPI entrypoint shim and generated dependency list for Vercel Python runtime.
+- `docs/vercel-deploy.md` - Vercel deployment guide, environment variables, read-only API key recommendation, and post-deploy checklist.
+- `docs-site/` - 8-page VitePress documentation site (`index.md`, `quickstart.md`, `how-bine-decides.md`, `api-reference.md`, `cli-and-mcp.md`, `evidence.md`, `devex-findings.md`, `limits.md`).
+- `docs/devex-evidence.md` - Line-sourced, zero-prose evidence ledger (`VERIFIED` vs `AGENT-REPORTED`) covering all endpoints, `llms.txt`/`llms-full.txt` vs SPA docs, RWA Data schemas, verbatim errors, latencies, rate limits, and all recorded quotes.
+- `docs/raw/endpoint_latency_15_runs_2026-10-07.jsonl` - Raw 15-call sequential read-only latency measurements (`3s` apart) across `/rwa/tokens` (`ondo` & `bstock`), `/token/top-liquidity`, and `/aggregator/quote`.
+- `docs/ui-audit.md` - Phase 0 baseline, Phase 5 post-refinement, and Phase C–F liquid-glass, Fair Lighthouse, and sRGB WCAG plate-contrast audit.
+- `docs/ui-design-rules.md` - Frontend design rules, tokens, typography, and component patterns.
+- `.agents/skills/bine-ui-standing-rules/SKILL.md` - Workspace skill enforcing the 5 standing frontend UI and verification rules.
+- `scripts/verify_rules_truth_table.py` - Automated 3-column rules truth table and data-driven count verifier.
+- `scripts/check_underscores.py` - Automated CDP underscore scanner across all routes/themes/states.
+- `scripts/verify_logo_and_alignment.py` - Automated CDP logo `x`-coordinate and pixel-diff verifier.
+- `scripts/verify_glass_and_perf.py` - Automated CDP liquid-glass screenshot, sRGB pixel contrast, overflow, and performance trace verifier.
+- `docs/PROJECT_BRIEF.md` - Original brief.
+- `docs/friction-log.md` - Empirical friction log with raw API measurements.
+- `docs/devex-facts.md` - Raw verified DevEx facts (Phase 8).
+- `docs/devex-report-facts.md` - Concise bullet fact sheet of all DevEx findings.
+- `docs/devex-report-map.md` - Form-aligned Developer Experience Report mapping table.
+- `docs/optional-hosting.md` - Optional single-service hosting guide (Phase 2).
+- `docs/dry_run_nvda_2usd.json` - Saved Transaction API dry-run output before live swap.
+- `docs/live_swap_nvda_2usd.json` - Saved first `$2.00` `NVDAB` live swap receipt (`Decision #16`).
+- `docs/live_swap_nvda_2usd_second_2026-10-05.json` - Saved second `$2.00` `NVDAB` live swap receipt (`Decision #18`, zero hand edits).
+- `tools/collect_evidence.py` - Standalone evidence sampler utility.
+- `backend/bine/client.py` - `BinanceClient` + `maybe_enable_dev_dns_fallback`.
+- `backend/bine/quality.py` - Data-quality filter (`assess_token_quality`, `MAX_SHARE_RATIO = 5.0`).
+- `backend/bine/quote_engine.py` - Live `/rwa/tokens` 60s cache + deterministic pre-trade guard (`schema_version: "1"`).
+- `backend/bine/execution.py` - Transaction API `/simulate` dry-run + `BINE_ADMIN_TOKEN` + `baw` (`npx` fallback) execution.
+- `backend/bine/cli.py` - `bine check` and `bine buy` CLI entry point (defaults to `BINE_API_URL=http://localhost:8000`).
+- `backend/bine/mcp_server.py` - Stdio MCP server (`bine_check`, `bine_buy`).
+- `skills/bine-pre-trade-guard/SKILL.md` - Wallet Skill for Binance Agentic Wallet.
+- `frontend/src/lib/humanize.ts` - Plain-English formatter for refusal codes, statuses, depth sources, field keys, and `GUARD_RULE_DEFINITIONS`.
+- `frontend/src/components/BineLogo.tsx` - `LiquidMetal` shader logo tile + wordmark lockup with monochrome chrome fallback and frozen `speed={0}` reduced-motion support.
+- `frontend/src/components/GlassStack.tsx` - `BineGlassFilterDef`, `GlassDetailPanel`, and `GlassStack` liquid-glass interactive card system.
+- `frontend/src/components/HeroArt.tsx` - 2D SVG lavender ring + 3D gold coin with `offset-path` roll and pointer parallax.
+- `frontend/src/components/shared.tsx` - `TopHeader` (`80px` nav bar, `LiveModeChip`, route-change `<h1>` focus) and `Footer` (`Connect` social pills).
+- `frontend/src/pages/Home.tsx` - `/` 2.5-screen Landing page with interactive glass proof strip and how-it-works cards.
+- `frontend/src/pages/Guard.tsx` - `/guard` Interactive Pre-Trade Guard with WAI-ARIA APG combobox, glass metric tiles, and glass guard-rule checks.
+- `frontend/src/pages/Refusals.tsx` - `/refusals` 8-rule interactive glass table, 7 recorded refusal glass cards, and one-at-a-time live runner.
+- `frontend/src/pages/Receipts.tsx` - `/receipts` verified on-chain receipts with expandable liquid-glass verification details.
+- `frontend/src/pages/Integrate.tsx` - `/integrate` WAI-ARIA APG tabbed reference (`HTTP`, `CLI`, `MCP`, `Agent skill`), live `"Try it"` runner, and interactive glass response field table.
+- `frontend/src/data/recorded-refusals.json` - Recorded Oct 5 regular-hours and overnight refusal samples with verified provenance.
+- `frontend/src/data/onchain-receipts.json` - Verified BNB Chain swap receipts (`Decision #16` and `Decision #18`).
 
 ## 11. Environment & Configuration
 - **Python**: `3.13.0` virtualenv at `backend/.venv`.

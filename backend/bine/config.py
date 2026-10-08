@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 _REPO_ROOT_ENV = Path(__file__).resolve().parents[2] / ".env"
@@ -38,6 +41,12 @@ class Settings(BaseSettings):
     # BSC mainnet: the only chain this project uses
     bsc_chain_id: str = "56"
 
+    @model_validator(mode="after")
+    def _force_live_mode_off_on_vercel(self) -> "Settings":
+        if os.environ.get("VERCEL"):
+            self.bine_live_mode = False
+        return self
+
     model_config = {
         "env_file": (str(_REPO_ROOT_ENV), ".env"),
         "env_file_encoding": "utf-8",
@@ -47,3 +56,4 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]
+

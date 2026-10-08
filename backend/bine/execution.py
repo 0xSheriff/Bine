@@ -25,6 +25,8 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
+import os
 import shutil
 import subprocess
 import time
@@ -46,6 +48,8 @@ from bine.quote_engine import (
     IssuerQuoteEvaluation,
     QuoteVerdictResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 BSCTRACE_TX_URL_PREFIX = "https://bsctrace.com/tx/"
 BSC_PUBLIC_RPC_URL = "https://bsc-dataseed.binance.org"
@@ -344,8 +348,12 @@ async def get_today_live_spend_usd(session: AsyncSession) -> float:
         DecisionLog.execution_status == "LIVE_SUBMITTED",
         DecisionLog.created_at >= start_of_day,
     )
-    result = await session.execute(q)
-    return float(result.scalar_one() or 0.0)
+    try:
+        result = await session.execute(q)
+        return float(result.scalar_one() or 0.0)
+    except Exception as exc:
+        logger.warning("get_today_live_spend_usd failed (defaulting to 0.0): %s", exc)
+        return 0.0
 
 
 def _extract_tx_hash(parsed: dict[str, Any] | None) -> str | None:
@@ -709,9 +717,16 @@ async def execute_trade_pipeline(
                 }
             ),
         )
-        session.add(log_row)
-        await session.commit()
-        await session.refresh(log_row)
+        try:
+            session.add(log_row)
+            await session.commit()
+            await session.refresh(log_row)
+        except Exception as exc:
+            logger.warning("Failed to persist refused decision_log row: %s", exc)
+            if getattr(log_row, "id", None) is None:
+                log_row.id = 0
+            if getattr(log_row, "created_at", None) is None:
+                log_row.created_at = datetime.now(timezone.utc)
         return _format_decision_response(log_row, verdict_resp, sim_res, exec_res)
 
     # Find winning issuer evaluation
@@ -735,7 +750,10 @@ async def execute_trade_pipeline(
         expected_address=winner.token_contract_address,
     )
 
-    check_admin = require_admin_token or bool(settings.bine_admin_token)
+    on_vercel = bool(os.environ.get("VERCEL"))
+    effective_live_mode = False if on_vercel else bool(settings.bine_live_mode)
+
+    check_admin = (not on_vercel) and (require_admin_token or bool(settings.bine_admin_token))
     admin_ok = (
         not check_admin
         or (
@@ -748,7 +766,7 @@ async def execute_trade_pipeline(
     if not sim_res.passed:
         exec_res = LiveExecutionResult(
             attempted=False,
-            live_mode_enabled=settings.bine_live_mode,
+            live_mode_enabled=effective_live_mode,
             status="DRY_RUN_FAILED",
             baw_command=baw_preview_cmd,
             detail=f"Blocked because simulation failed: {sim_res.summary}",
@@ -756,15 +774,23 @@ async def execute_trade_pipeline(
     elif not execute_live:
         exec_res = LiveExecutionResult(
             attempted=False,
-            live_mode_enabled=settings.bine_live_mode,
+            live_mode_enabled=effective_live_mode,
             status="DRY_RUN_OK",
             baw_command=baw_preview_cmd,
             detail=sim_res.summary,
         )
+    elif on_vercel:
+        exec_res = LiveExecutionResult(
+            attempted=False,
+            live_mode_enabled=False,
+            status="LIVE_DISABLED",
+            baw_command=baw_preview_cmd,
+            detail="Simulation passed, but live trading is off (BINE_LIVE_MODE=false; Vercel deployment is dry-run only).",
+        )
     elif not admin_ok:
         exec_res = LiveExecutionResult(
             attempted=False,
-            live_mode_enabled=settings.bine_live_mode,
+            live_mode_enabled=effective_live_mode,
             status="LIVE_UNAUTHORIZED",
             baw_command=baw_preview_cmd,
             detail="Live execution rejected: valid BINE_ADMIN_TOKEN is required when execute_live=true.",
@@ -772,7 +798,7 @@ async def execute_trade_pipeline(
     elif verdict_resp.amount_usd > settings.bine_max_trade_usd:
         exec_res = LiveExecutionResult(
             attempted=False,
-            live_mode_enabled=settings.bine_live_mode,
+            live_mode_enabled=effective_live_mode,
             status="LIVE_BLOCKED_CAP",
             baw_command=baw_preview_cmd,
             detail=(
@@ -785,7 +811,7 @@ async def execute_trade_pipeline(
         if today_spent + verdict_resp.amount_usd > settings.bine_daily_cap_usd:
             exec_res = LiveExecutionResult(
                 attempted=False,
-                live_mode_enabled=settings.bine_live_mode,
+                live_mode_enabled=effective_live_mode,
                 status="LIVE_BLOCKED_CAP",
                 baw_command=baw_preview_cmd,
                 detail=(
@@ -794,7 +820,7 @@ async def execute_trade_pipeline(
                     f"${settings.bine_daily_cap_usd:,.2f} (BINE_DAILY_CAP_USD)."
                 ),
             )
-        elif not settings.bine_live_mode:
+        elif not effective_live_mode:
             exec_res = LiveExecutionResult(
                 attempted=False,
                 live_mode_enabled=False,
@@ -833,7 +859,7 @@ async def execute_trade_pipeline(
         approval_simulation_status=sim_res.approval_simulation_status,
         spender_address=sim_res.approval_spender or sim_res.swap_tx_to,
         estimated_gas_limit=sim_res.swap_tx_gas_limit,
-        live_mode=settings.bine_live_mode,
+        live_mode=effective_live_mode,
         execution_status=exec_res.status,
         tx_hash=exec_res.tx_hash,
         bsctrace_url=exec_res.bsctrace_url,
@@ -846,9 +872,16 @@ async def execute_trade_pipeline(
             }
         ),
     )
-    session.add(log_row)
-    await session.commit()
-    await session.refresh(log_row)
+    try:
+        session.add(log_row)
+        await session.commit()
+        await session.refresh(log_row)
+    except Exception as exc:
+        logger.warning("Failed to persist decision_log row: %s", exc)
+        if getattr(log_row, "id", None) is None:
+            log_row.id = 0
+        if getattr(log_row, "created_at", None) is None:
+            log_row.created_at = datetime.now(timezone.utc)
     return _format_decision_response(log_row, verdict_resp, sim_res, exec_res)
 
 

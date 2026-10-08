@@ -1,22 +1,36 @@
 """Async SQLAlchemy engine and session factory.
 
 SQLite for local dev, Postgres for deployment.
-DATABASE_URL env var controls which is used; defaults to SQLite at ./bine.db.
+DATABASE_URL or BINE_DB_PATH env var controls which is used; defaults to /tmp/bine.db on Vercel and ./bine.db locally.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from bine.models import Base
 
-_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./bine.db")
+logger = logging.getLogger(__name__)
 
-# Postgres driver needs asyncpg, not psycopg2
-if _DATABASE_URL.startswith("postgresql://"):
-    _DATABASE_URL = _DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+def resolve_database_url() -> str:
+    """Resolve the SQLAlchemy async database URL from environment variables."""
+    explicit_url = os.environ.get("DATABASE_URL")
+    if explicit_url:
+        if explicit_url.startswith("postgresql://"):
+            return explicit_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return explicit_url
+
+    db_path = os.environ.get("BINE_DB_PATH")
+    if not db_path:
+        db_path = "/tmp/bine.db" if os.environ.get("VERCEL") else "./bine.db"
+    return f"sqlite+aiosqlite:///{db_path}"
+
+
+_DATABASE_URL = resolve_database_url()
 
 engine = create_async_engine(
     _DATABASE_URL,
@@ -33,6 +47,10 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def init_db() -> None:
-    """Create all tables. Safe to call on every startup, only creates if missing."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Create all tables. Safe to call on every startup; never crashes if DB is unwritable."""
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        logger.warning("init_db failed (continuing without SQLite write access): %s", exc)
+

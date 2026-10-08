@@ -15,6 +15,7 @@ import asyncio
 import hmac
 import json
 import logging
+import os
 import time as _time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -111,7 +112,7 @@ class QuoteResponseModel(BaseModel):
 # ── Rate Limiting (Phase 4 Public Deploy Safety) ───────────────────────────────
 
 _RATE_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
-QUOTE_RATE_LIMIT_PER_MIN = 60
+QUOTE_RATE_LIMIT_PER_MIN = 20
 EXECUTE_RATE_LIMIT_PER_MIN = 20
 
 
@@ -271,36 +272,40 @@ async def _resolve_ticker_samples(
     except Exception as exc:
         logger.debug("Live /rwa/tokens fetch fell back to DB (%s: %s)", type(exc).__name__, exc)
 
-    async with AsyncSessionLocal() as session:
-        sub = (
-            select(
-                TokenSample.platform_id,
-                func.max(TokenSample.sampled_at).label("max_at"),
+    try:
+        async with AsyncSessionLocal() as session:
+            sub = (
+                select(
+                    TokenSample.platform_id,
+                    func.max(TokenSample.sampled_at).label("max_at"),
+                )
+                .where(
+                    (func.upper(TokenSample.underlying_ticker) == ticker_upper)
+                    | (func.upper(TokenSample.token_symbol) == ticker_upper),
+                    TokenSample.ok == True,  # noqa: E712
+                )
+                .group_by(TokenSample.platform_id)
+                .subquery()
             )
-            .where(
-                (func.upper(TokenSample.underlying_ticker) == ticker_upper)
-                | (func.upper(TokenSample.token_symbol) == ticker_upper),
-                TokenSample.ok == True,  # noqa: E712
+            q = (
+                select(TokenSample)
+                .join(
+                    sub,
+                    (TokenSample.platform_id == sub.c.platform_id)
+                    & (TokenSample.sampled_at == sub.c.max_at),
+                )
+                .where(
+                    (func.upper(TokenSample.underlying_ticker) == ticker_upper)
+                    | (func.upper(TokenSample.token_symbol) == ticker_upper),
+                    TokenSample.ok == True,  # noqa: E712
+                )
+                .order_by(TokenSample.platform_id.asc())
             )
-            .group_by(TokenSample.platform_id)
-            .subquery()
-        )
-        q = (
-            select(TokenSample)
-            .join(
-                sub,
-                (TokenSample.platform_id == sub.c.platform_id)
-                & (TokenSample.sampled_at == sub.c.max_at),
-            )
-            .where(
-                (func.upper(TokenSample.underlying_ticker) == ticker_upper)
-                | (func.upper(TokenSample.token_symbol) == ticker_upper),
-                TokenSample.ok == True,  # noqa: E712
-            )
-            .order_by(TokenSample.platform_id.asc())
-        )
-        result = await session.execute(q)
-        return list(result.scalars().all())
+            result = await session.execute(q)
+            return list(result.scalars().all())
+    except Exception as exc:
+        logger.warning("DB fallback in _resolve_ticker_samples failed: %s", exc)
+        return []
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -308,15 +313,20 @@ async def _resolve_ticker_samples(
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     settings = get_settings()
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(func.count( TokenSample.id), func.min(TokenSample.sampled_at), func.max(TokenSample.sampled_at))
-        )
-        count, oldest, newest = result.one()
+    count, oldest, newest = 0, None, None
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(func.count(TokenSample.id), func.min(TokenSample.sampled_at), func.max(TokenSample.sampled_at))
+            )
+            count, oldest, newest = result.one()
+    except Exception as exc:
+        logger.warning("health DB query failed: %s", exc)
+    effective_live = False if os.environ.get("VERCEL") else bool(settings.bine_live_mode)
     return {
         "status": "ok",
         "schema_version": SCHEMA_VERSION,
-        "live_mode": settings.bine_live_mode,
+        "live_mode": effective_live,
         "max_trade_usd": settings.bine_max_trade_usd,
         "daily_cap_usd": settings.bine_daily_cap_usd,
         "sample_count": count or 0,
@@ -446,6 +456,7 @@ async def quote_stock(
     settings = get_settings()
     maybe_enable_dev_dns_fallback(settings.dev_dns_fallback)
     wallet = settings.bine_wallet_address or DEFAULT_QUOTE_WALLET
+    effective_live = False if os.environ.get("VERCEL") else bool(settings.bine_live_mode)
 
     try:
         async with BinanceClient(
@@ -480,7 +491,7 @@ async def quote_stock(
         amount_usd=amount_usd,
         evaluations=evaluations,
         max_live_trade_usd=settings.bine_max_trade_usd,
-        live_mode=settings.bine_live_mode,
+        live_mode=effective_live,
     )
     payload = verdict_resp.to_dict(include_details=details)
     _QUOTE_CACHE[cache_key] = (_time.monotonic(), payload)
@@ -513,9 +524,11 @@ async def execute_stock_trade(
     _check_rate_limit(request, "execute", EXECUTE_RATE_LIMIT_PER_MIN)
     settings = get_settings()
     maybe_enable_dev_dns_fallback(settings.dev_dns_fallback)
+    on_vercel = bool(os.environ.get("VERCEL"))
+    effective_live = False if on_vercel else bool(settings.bine_live_mode)
 
     supplied_token = x_bine_admin_token if x_bine_admin_token is not None else req.admin_token
-    if req.execute_live:
+    if req.execute_live and not on_vercel:
         if not settings.bine_admin_token or not supplied_token or not hmac.compare_digest(
             supplied_token, settings.bine_admin_token
         ):
@@ -554,7 +567,7 @@ async def execute_stock_trade(
             amount_usd=req.amount_usd,
             evaluations=evaluations,
             max_live_trade_usd=settings.bine_max_trade_usd,
-            live_mode=settings.bine_live_mode,
+            live_mode=effective_live,
         )
 
         async with AsyncSessionLocal() as session:
@@ -566,7 +579,7 @@ async def execute_stock_trade(
                 settings=settings,
                 execute_live=req.execute_live,
                 admin_token=supplied_token,
-                require_admin_token=req.execute_live,
+                require_admin_token=req.execute_live and not on_vercel,
             )
 
 
@@ -576,13 +589,17 @@ async def list_decisions(
     live_only: bool = Query(False, description="When true, return only executed live trades with tx_hash"),
 ) -> dict[str, Any]:
     """Return recent decisions, refusals, dry-run simulations, and live swaps from `decision_log`."""
-    async with AsyncSessionLocal() as session:
-        q = select(DecisionLog)
-        if live_only:
-            q = q.where(DecisionLog.tx_hash.is_not(None), DecisionLog.tx_hash != "")
-        q = q.order_by(DecisionLog.id.desc()).limit(limit)
-        result = await session.execute(q)
-        rows = list(result.scalars().all())
+    try:
+        async with AsyncSessionLocal() as session:
+            q = select(DecisionLog)
+            if live_only:
+                q = q.where(DecisionLog.tx_hash.is_not(None), DecisionLog.tx_hash != "")
+            q = q.order_by(DecisionLog.id.desc()).limit(limit)
+            result = await session.execute(q)
+            rows = list(result.scalars().all())
+    except Exception as exc:
+        logger.warning("list_decisions DB query failed (returning empty list): %s", exc)
+        return {"count": 0, "decisions": []}
 
     items = []
     for r in rows:
@@ -622,10 +639,14 @@ async def list_decisions(
 @app.get("/api/decisions/{decision_id}")
 async def get_decision_detail(decision_id: int) -> dict[str, Any]:
     """Return the full stored `ExecuteTradeResponse` payload for a single `decision_log` row."""
-    async with AsyncSessionLocal() as session:
-        q = select(DecisionLog).where(DecisionLog.id == decision_id)
-        result = await session.execute(q)
-        row = result.scalar_one_or_none()
+    row = None
+    try:
+        async with AsyncSessionLocal() as session:
+            q = select(DecisionLog).where(DecisionLog.id == decision_id)
+            result = await session.execute(q)
+            row = result.scalar_one_or_none()
+    except Exception as exc:
+        logger.warning("get_decision_detail DB query failed: %s", exc)
 
     if row is None:
         raise HTTPException(status_code=404, detail=f"Decision #{decision_id} not found")

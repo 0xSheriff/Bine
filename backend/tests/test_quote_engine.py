@@ -817,3 +817,173 @@ def test_missing_or_rejected_api_keys_returns_503_and_cli_single_line(
         assert out_lines == ["Binance API keys missing or rejected"]
 
 
+@pytest.mark.asyncio
+async def test_quote_15s_cache_preserves_quoted_at_and_20_per_min_rate_limit(
+    nvda_ondo_quote_fixture: dict,
+    nvda_bstock_quote_fixture: dict,
+    nvda_ondo_liq_fixture: dict,
+    nvda_bstock_liq_fixture: dict,
+) -> None:
+    """Identical (ticker, amount_usd) requests within 15s return the cached payload with original quoted_at; 21st request in 60s returns 429."""
+    from bine.app import QUOTE_RATE_LIMIT_PER_MIN, _QUOTE_CACHE, app, reset_rate_limits
+
+    assert QUOTE_RATE_LIMIT_PER_MIN == 20
+    _QUOTE_CACHE.clear()
+    reset_rate_limits()
+
+    ondo_payload = json.loads((FIXTURES / "rwa_tokens_ondo_bsc.json").read_text())
+    bstock_payload = json.loads((FIXTURES / "rwa_tokens_bstock_bsc.json").read_text())
+    now = datetime.now(timezone.utc)
+    ondo_sample, _ = _make_nvda_samples(now)
+    quote_calls = 0
+
+    def _rwa_router(request):
+        pid = request.url.params.get("platformId", "")
+        return Response(200, json=ondo_payload if pid == "ondo" else bstock_payload)
+
+    def _quote_router(request):
+        nonlocal quote_calls
+        quote_calls += 1
+        to_addr = request.url.params.get("toTokenAddress", "").lower()
+        if to_addr == ondo_sample.token_contract_address.lower():
+            return Response(200, json=nvda_ondo_quote_fixture)
+        return Response(200, json=nvda_bstock_quote_fixture)
+
+    def _liq_router(request):
+        addr = request.url.params.get("tokenContractAddress", "").lower()
+        if addr == ondo_sample.token_contract_address.lower():
+            return Response(200, json=nvda_ondo_liq_fixture)
+        return Response(200, json=nvda_bstock_liq_fixture)
+
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/market/rwa/tokens").mock(side_effect=_rwa_router)
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/aggregator/quote").mock(side_effect=_quote_router)
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/market/token/top-liquidity").mock(side_effect=_liq_router)
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            r1 = await client.get("/api/quote?ticker=NVDA&amount_usd=5.50")
+            assert r1.status_code == 200
+            first_quoted_at = r1.json()["quoted_at"]
+            calls_after_first = quote_calls
+            assert calls_after_first == 2
+
+            # Second identical request within 15s hits cache, does not call upstream, and preserves quoted_at
+            r2 = await client.get("/api/quote?ticker=NVDA&amount_usd=5.50")
+            assert r2.status_code == 200
+            assert r2.json()["quoted_at"] == first_quoted_at
+            assert quote_calls == calls_after_first
+
+            # Exhaust remaining 18 requests in the 20/min window
+            for _ in range(18):
+                rn = await client.get("/api/quote?ticker=NVDA&amount_usd=5.50")
+                assert rn.status_code == 200
+
+            # 21st request within 60s returns HTTP 429
+            r21 = await client.get("/api/quote?ticker=NVDA&amount_usd=5.50")
+            assert r21.status_code == 429
+            assert "20 requests per minute" in r21.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_serverless_sqlite_path_and_vercel_forces_live_mode_off(
+    monkeypatch: pytest.MonkeyPatch,
+    nvda_ondo_quote_fixture: dict,
+    nvda_bstock_quote_fixture: dict,
+    nvda_ondo_liq_fixture: dict,
+    nvda_bstock_liq_fixture: dict,
+) -> None:
+    """Verifies BINE_DB_PATH and VERCEL=/tmp/bine.db resolution, unwritable DB resilience, and VERCEL=1 forcing live mode off."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    import bine.app as app_mod
+    from bine.config import get_settings
+    from bine.database import resolve_database_url
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("BINE_DB_PATH", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    assert resolve_database_url() == "sqlite+aiosqlite:///./bine.db"
+
+    monkeypatch.setenv("VERCEL", "1")
+    assert resolve_database_url() == "sqlite+aiosqlite:////tmp/bine.db"
+
+    monkeypatch.setenv("BINE_DB_PATH", "/custom/tmp/bine.db")
+    assert resolve_database_url() == "sqlite+aiosqlite:////custom/tmp/bine.db"
+
+    # VERCEL=1 forces BINE_LIVE_MODE=False even when BINE_LIVE_MODE=true in env
+    monkeypatch.setenv("BINE_LIVE_MODE", "true")
+    settings = get_settings()
+    assert settings.bine_live_mode is False
+
+    # Point AsyncSessionLocal at an unwritable path and confirm /api/health, /api/decisions, /api/quote, and /api/execute survive
+    bad_engine = create_async_engine(
+        "sqlite+aiosqlite:////nonexistent_readonly_dir_bine/bine.db",
+        connect_args={"check_same_thread": False},
+    )
+    bad_session_factory = async_sessionmaker(bind=bad_engine, class_=AsyncSession, expire_on_commit=False)
+    monkeypatch.setattr(app_mod, "AsyncSessionLocal", bad_session_factory)
+
+    ondo_payload = json.loads((FIXTURES / "rwa_tokens_ondo_bsc.json").read_text())
+    bstock_payload = json.loads((FIXTURES / "rwa_tokens_bstock_bsc.json").read_text())
+    swap_fixture = json.loads((FIXTURES / "swap_nvda_bstock_2usd.json").read_text())
+    approve_fixture = json.loads((FIXTURES / "approve_usdt_bsc.json").read_text())
+    sim_swap_fixture = json.loads((FIXTURES / "simulate_swap_nvda_bstock.json").read_text())
+    sim_approve_fixture = json.loads((FIXTURES / "simulate_approve_usdt.json").read_text())
+    sim_calls = 0
+
+    def _rwa_router(request):
+        pid = request.url.params.get("platformId", "")
+        return Response(200, json=ondo_payload if pid == "ondo" else bstock_payload)
+
+    def _sim_router(request):
+        nonlocal sim_calls
+        sim_calls += 1
+        return Response(200, json=sim_swap_fixture if sim_calls == 1 else sim_approve_fixture)
+
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/market/rwa/tokens").mock(side_effect=_rwa_router)
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/aggregator/quote").mock(
+            return_value=Response(200, json=nvda_bstock_quote_fixture)
+        )
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/market/token/top-liquidity").mock(
+            return_value=Response(200, json=nvda_bstock_liq_fixture)
+        )
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/aggregator/swap").mock(
+            return_value=Response(200, json=swap_fixture)
+        )
+        respx_mock.get("https://web3.binance.com/build/api/v1/dex/aggregator/approve-transaction").mock(
+            return_value=Response(200, json=approve_fixture)
+        )
+        respx_mock.post("https://web3.binance.com/build/api/v1/dex/pre-transaction/simulate").mock(
+            side_effect=_sim_router
+        )
+
+        transport = ASGITransport(app=app_mod.app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            rh = await client.get("/api/health")
+            assert rh.status_code == 200
+            assert rh.json()["live_mode"] is False
+
+            rd = await client.get("/api/decisions")
+            assert rd.status_code == 200
+            assert rd.json() == {"count": 0, "decisions": []}
+
+            rq = await client.get("/api/quote?ticker=NVDA&amount_usd=25.0")
+            assert rq.status_code == 200
+            assert rq.json()["verdict"] == "BUY"
+
+            re_resp = await client.post(
+                "/api/execute",
+                json={"ticker": "NVDA", "amount_usd": 25.0, "execute_live": True},
+            )
+            assert re_resp.status_code == 200
+            exec_data = re_resp.json()["execution"]
+            assert exec_data["attempted"] is False
+            assert exec_data["live_mode_enabled"] is False
+            assert exec_data["status"] == "LIVE_DISABLED"
+            assert "Vercel deployment is dry-run only" in exec_data["detail"]
+
+    await bad_engine.dispose()
+
+

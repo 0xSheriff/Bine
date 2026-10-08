@@ -1,38 +1,37 @@
-# Bine
+# BINE
 
-**Bine is a pre-trade safety guard for tokenized stocks on BNB Smart Chain (`chainId="56"`) that tells humans and AI agents whether a tokenized stock is safe to buy right now, what they will actually receive per share, and if not, why not.**
+Pre-trade safety check for tokenized stocks on BNB Chain.
 
----
+Every US stock on BNB Chain can be issued by more than one provider (Ondo and bStocks), with different rules, minimums, trading hours and pool depth. BINE checks all of them before you or your AI agent buys, and gives one answer:
 
-## For judges
+- **BUY** and which token to use, or
+- **DO NOT BUY** and the exact reason in plain English.
 
-1. **How to run**:
-   - Backend (`http://localhost:8000`):
-     `set -a; source .env; set +a; DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend --host 0.0.0.0 --port 8000`
-   - Frontend (`http://localhost:5173` or `http://localhost:5174`):
-     `npm --prefix frontend run dev -- --host 0.0.0.0 --port 5173`
-   - CLI:
-     `backend/.venv/bin/bine check NVDA 5.50`
-2. **4 presets to try on `/guard`**:
-   - **`NVDA $5.50`** (`BUY`): Compares `NVDAB` (bStocks) and `NVDAon` (Ondo), checks the 5 bps tie band, and enables `"Preview trade (dry-run)"` via `POST /api/v1/dex/pre-transaction/simulate`.
-   - **`AAPL $2`** (`REFUSE` / `below_issuer_minimum`): Triggers Ondo's `[40375] Minimum order amount is 5 USD.` rule with a one-click `"Try $5.50 instead"` action.
-   - **`SPYon $250`** (`REFUSE` / `slippage_too_high` off-hours, `BUY` regular hours): Demonstrates the off-hours PancakeSwap V3 pool thinness (`+40.75%` to `+82.07%` above reference) vs regular-hours Ondo RWA (`+0.0037%`).
-   - **`KLAC $5.50`** (`REFUSE` / `depth_thin` + `quality_unreliable` share-ratio limit): Surfaces `KLACon`'s `10.02567794x` share ratio (`$20,851.52` per token vs `$2,079.73` per share), outside the `0.25-5.00x` supported range.
-3. **What to look at**:
-   - **`/` (Landing page)**: Product overview, live proof strip, 3-step pipeline, 3 recorded refusal highlights, and 2 verified BNB Chain receipt summaries.
-   - **`/guard` (Pre-Trade Guard)**: Accessible WAI-ARIA combobox across all 448 tickers, 5 plain-English decision metrics, 6 guard checks, `"Preview trade (dry-run)"` simulation panel, and progressive disclosures (`How this was calculated`, `Compare issuers`, `Recent checks`).
-   - **`/refusals` (Why Bine says no)**: All 8 refusal rules in plain English, 6 recorded empirical refusals from Oct 5 regular and overnight sessions, and a one-at-a-time `"Run live now"` comparator.
-   - **`/receipts` (On-chain receipts)**: Both verified live `$2.00` `NVDAB` swaps on BNB Chain with expandable BscScan / BscTrace verification details, filled vs quoted shares, block numbers, and BNB gas paid.
-   - **`/integrate` (Developers)**: Copy-paste integration for `HTTP` (with live `"Try it"` runner), `CLI`, `MCP`, and `Agent skill`, plus the 13-key response contract and error table.
-4. **On-chain receipts**:
-   - **Swap #1 (`Decision #16`, Oct 3 off-hours, `$2.00` USDT -> `NVDAB`)**: [`docs/live_swap_nvda_2usd.json`](docs/live_swap_nvda_2usd.json) (`txHash`: `0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`, `-0.13 bps` vs quote).
-   - **Swap #2 (`Decision #18`, Oct 5 regular hours, `$2.00` USDT -> `NVDAB`)**: [`docs/live_swap_nvda_2usd_second_2026-10-05.json`](docs/live_swap_nvda_2usd_second_2026-10-05.json) (`txHash`: `0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75`, BSC Block `125889084`, `0.00 bps` vs quote, zero hand edits).
+Live demo: TODO add Vercel URL after deploy.  Demo video: TODO.
 
----
+## Three real checks from BINE
+
+```text
+$ bine check AAPL 2
+DO NOT BUY: Ondo requires at least $5 per order. Try $5.50.
+
+$ bine check NVDA 5.50
+BUY NVDAB (bStocks) - about 0.2% over the stock reference price.
+
+$ bine check SPYon 250   # outside US market hours
+DO NOT BUY: pool is thin right now; fill is 40% to 82% above the stock price.
+```
+
+## Proof on BNB Chain
+
+Two live $2 test swaps were executed on BNB Smart Chain after passing BINE's checks and dry-run simulation:
+
+- Swap 1 (off-hours, $2 -> NVDAB): [0x00c0fabd...c228e506](https://bscscan.com/tx/0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506)
+- Swap 2 (US market hours, $2 -> NVDAB): [0xa3693383...fc2a3e75](https://bscscan.com/tx/0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75)
+
+Live trading is off by default and capped at $6 per trade / $10 per day.
 
 ## Run it in 3 commands
-
-Requires `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` for the Binance Web3 Open API (`https://web3.binance.com/build`). Without valid keys in `.env`, the Open API path `GET /api/v1/dex/market/rwa/tokens` returns `HTTP 401` (`code: 40101`, `"API Key is required"`, while the non-API path `/rwa/tokens` returns an `HTTP 302` redirect to the web UI; see [`docs/raw/rwa_tokens_no_key_2026-10-05.txt`](docs/raw/rwa_tokens_no_key_2026-10-05.txt)), `/api/quote` returns `HTTP 503` (`"Binance API keys missing or rejected"`), and `bine` prints that single line with exit code `1`.
 
 ```bash
 git clone <repo-url> bine && cd bine && python3 -m venv .venv && .venv/bin/pip install -e backend
@@ -40,123 +39,15 @@ printf "BINANCE_API_KEY=<your-key>\nBINANCE_SECRET_KEY=<your-secret>\n" > .env &
 .venv/bin/bine check NVDA 5.50
 ```
 
-`bine` and `bine-mcp` connect to `BINE_API_URL` (default `http://localhost:8000`) when `BINE_DIRECT_MODE=true` is not set. If `http://localhost:8000` is not running, `bine` prints a single line showing how to start it (`uvicorn bine.app:app --app-dir backend --port 8000`). Optional single-service hosting notes are in [`docs/optional-hosting.md`](docs/optional-hosting.md).
+## Use it from anywhere
 
----
+- Web app: `/guard`, `/refusals`, `/receipts`, `/integrate`
+- CLI: `bine check NVDA 5.50`, `bine buy NVDA 2`
+- HTTP: `GET /api/quote?ticker=NVDA&amount_usd=5.50`
+- MCP server and Claude skill: see `/integrate` or the full docs in `docs-site/`
 
-## Local URL & Web Routes
+## Full documentation
 
-- **Local API & Web App**: `http://localhost:8000` (frontend dev server: `http://localhost:5173` or `http://localhost:5174`)
-- **Routes**:
-  - `/` - Landing page with proof strip, 3-step explanation, recorded refusals preview, and verified BNB Chain receipts
-  - `/guard` - Interactive pre-trade guard (`NVDA` at `$5.50` default) + Transaction API `/simulate` dry-run
-  - `/refusals` - All 8 refusal rules, 6 recorded empirical refusals from Oct 5, and one-at-a-time `"Run live now"` comparator
-  - `/receipts` - Verified on-chain trades with expandable BscScan / BscTrace details, filled vs quoted shares, and BNB gas
-  - `/integrate` - Tabbed integration reference (`HTTP`, `CLI`, `MCP`, `Agent skill`) with live `"Try it"` runner
-
----
-
-## Plug-and-Play Surfaces
-
-### 1. HTTP API (`schema_version: "1"`)
-
-```bash
-curl -s "http://localhost:8000/api/quote?ticker=NVDA&amount_usd=5.50" | jq .
-```
-
-```json
-{
-  "schema_version": "1",
-  "ticker": "NVDA",
-  "amount_usd": 5.5,
-  "quoted_at": "2026-10-03T00:15:00Z",
-  "verdict": "BUY",
-  "token": {
-    "symbol": "NVDAB",
-    "address": "0x02fca66c1d1afb4e2a7884261eb00f63598a7436",
-    "issuer": "bstock"
-  },
-  "shares": 0.0235,
-  "all_in_price_per_share": 234.94,
-  "reference_price_per_share": 234.21,
-  "spread_pct": 0.31,
-  "refusal": null,
-  "alternative": {
-    "symbol": "NVDAon",
-    "issuer": "ondo",
-    "eligible": true,
-    "note": "Either works (within 5 bps). Also checked NVDAon on Ondo: $0.06 per share less."
-  },
-  "market": {
-    "status": "offhours",
-    "open": true
-  }
-}
-```
-
-### 2. CLI (`bine`)
-
-```bash
-bine check NVDA 5.50          # One plain-English line (exit 0 on BUY, exit 2 on REFUSE)
-bine check AAPL 2 --json      # Frozen schema_version="1" JSON
-bine buy NVDA 5.50            # Pre-trade guard + /pre-transaction/simulate dry-run
-```
-
-### 3. MCP Server (`bine-mcp`, stdio JSON-RPC 2.0)
-
-```json
-{
-  "mcpServers": {
-    "bine-pre-trade-guard": {
-      "command": "bine-mcp",
-      "env": {
-        "BINE_API_URL": "http://localhost:8000"
-      }
-    }
-  }
-}
-```
-
-Tools exposed:
-- `bine_check(ticker, amount_usd=5.50)`
-- `bine_buy(ticker, amount_usd=5.50, confirm=False)`
-
-### 4. Binance Agentic Wallet Skill
-
-```bash
-mkdir -p ~/.claude/skills/bine-pre-trade-guard
-cp skills/bine-pre-trade-guard/SKILL.md ~/.claude/skills/bine-pre-trade-guard/SKILL.md
-```
-
----
-
-## Screenshots
-
-| View | Light (`1440px`) | Dark (`1440px`) | Mobile (`390px`) |
-|---|---|---|---|
-| **BUY (`NVDA` `$5.50`)** | [`docs/screenshots/ui_buy_light_1440.png`](docs/screenshots/ui_buy_light_1440.png) | [`docs/screenshots/ui_buy_dark_1440.png`](docs/screenshots/ui_buy_dark_1440.png) | [`docs/screenshots/ui_buy_light_390.png`](docs/screenshots/ui_buy_light_390.png) |
-| **REFUSE (`AAPL` `$2.00`)** | [`docs/screenshots/ui_refuse_light_1440.png`](docs/screenshots/ui_refuse_light_1440.png) | [`docs/screenshots/ui_refuse_dark_1440.png`](docs/screenshots/ui_refuse_dark_1440.png) | [`docs/screenshots/ui_refuse_light_390.png`](docs/screenshots/ui_refuse_light_390.png) |
-| **REFUSE (`SPYon` `$250.00`)** | [`docs/screenshots/ui_refuse_spyon_light_1440.png`](docs/screenshots/ui_refuse_spyon_light_1440.png) | [`docs/screenshots/ui_refuse_spyon_dark_1440.png`](docs/screenshots/ui_refuse_spyon_dark_1440.png) | [`docs/screenshots/ui_refuse_spyon_light_390.png`](docs/screenshots/ui_refuse_spyon_light_390.png) |
-| **Dry-Run Confirm Panel** | [`docs/screenshots/ui_confirm_light_1440.png`](docs/screenshots/ui_confirm_light_1440.png) | [`docs/screenshots/ui_confirm_dark_1440.png`](docs/screenshots/ui_confirm_dark_1440.png) | [`docs/screenshots/ui_confirm_light_390.png`](docs/screenshots/ui_confirm_light_390.png) |
-
----
-
-## Safety Defaults
-
-- **`BINE_LIVE_MODE=false` by default**: `POST /api/execute` and `bine buy` run `POST /api/v1/dex/pre-transaction/simulate` dry-runs only unless explicitly enabled.
-- **Quote placeholder address**: `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (`DEFAULT_QUOTE_WALLET`) is a placeholder public address used only for read-only `/api/v1/dex/aggregator/quote` requests when `BINE_WALLET_ADDRESS` is not configured.
-- **`BINE_ADMIN_TOKEN` constant-time gate**: Any request with `execute_live=true` requires a matching `X-Bine-Admin-Token` header (`hmac.compare_digest`), returning `HTTP 403` otherwise.
-- **Hard trade caps**: `BINE_MAX_TRADE_USD=6.00` per trade and `BINE_DAILY_CAP_USD=10.00` per UTC day.
-- **Rate limits & CORS**: Sliding-window per-IP rate limits (`60 req/min` on `/api/quote`, `20 req/min` on `/api/execute`) and explicit `GET, POST` origin allowlist.
-
----
-
-## Verified On-Chain Execution & Evidence Artifacts
-
-- **Dry-run artifact (`docs/dry_run_nvda_2usd.json`) vs. `baw` live router contract**:
-  - `"passed": true` with `"fail_reason": "execution reverted: BEP20: transfer amount exceeds allowance"` is the expected pre-approval state when simulating raw `/api/v1/dex/aggregator/swap` calldata before USDT is approved to the DEX aggregator router (`0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5`), and the approval simulation (`"approval_simulation_status": "SUCCESS"`) returned `SUCCESS`.
-  - The Transaction API dry-run simulated the `/api/v1/dex/aggregator/swap` calldata targeting router `0xB44446b0c8E56988c34f7Ff73Ae904982b5FdDA5` (whose on-chain USDT allowance is `0`), whereas the live swap executed through `baw`'s own router contract (`0xb300000b72DEAEb607a12d5f54773D1C19c7028d`), as evidenced by the `approve` transaction (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`, which approved `uint256.max` of USDT on-chain to spender `0xb300000b72DEAEb607a12d5f54773D1C19c7028d`, leaving `uint256.max - 4 * 10^18` = `115792089237316195423570985008687907853269984665640564039453584007913129639935` wei after the two `$2` swaps; see [`docs/raw/usdt_allowance_2026-10-05.txt`](docs/raw/usdt_allowance_2026-10-05.txt)) and the `swap` transaction (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, whose `to` address is `0xb300000b72deaeb607a12d5f54773d1c19c7028d`).
-- **Live `$2` `NVDAB` swap artifact (`docs/live_swap_nvda_2usd.json`) & reconciliation note**: First-time swaps run an `approve` tx (`0x803cda0317fd9aa667b193b958daad2ccc862d5d8532e23c6825837504aeeb64`) before the `swap` tx (`0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`, BSC Block `125555002`). `baw market-order swap` returns the parent `orderId` (`26100300001937918699`), `--orderId` on it returns an empty list, and only `baw market-order list --json` shows the child (`orderId` `26100300001937918737`). The first live `$2` `NVDAB` swap recorded the parent `orderId` (`26100300001937918699`) and no `txHash`; `docs/live_swap_nvda_2usd.json` and `DecisionLog #16` were reconciled afterwards from `baw market-order list` (child `orderId` `26100300001937918737`) and the BSC receipt for `0x00c0fabd652f5897bde46ba8a3e3c4c6179bdf52734d870f23878363c228e506`. Raw `baw` outputs and the commands that produced them are kept in `docs/raw/`.
-- **Second live `$2` `NVDAB` swap (`docs/live_swap_nvda_2usd_second_2026-10-05.json`, 94 minutes after open / 11:04 New York)**: Executed via `bine buy NVDA 2 --yes` at `2026-10-05T15:05Z` (`marketStatus = "regular"`, 94 minutes after the 09:30 New York open) with zero hand edits. `DecisionLog #17` recorded the automatic pre-trade dry-run (`action="dry_run"`, `execution_status="DRY_RUN_OK"`, `order_id=null`) and `DecisionLog #18` recorded the live swap (`action="execute"`, `execution_status="LIVE_SUBMITTED"`, `order_id="26100500001942767719"`, `tx_hash="0xa3693383a9493600df08ae10a6a64faa6a7543e3bde9f6bbca3fd7acfc2a3e75"`, BSC Block `125889084`). Because the first swap's `approve` tx (`0x803cda03...eeb64`) granted `uint256.max` USDT allowance to `baw`'s router (`0xb300000b72DEAEb607a12d5f54773D1C19c7028d`), the second swap required no separate `approve` tx and returned the direct order ID `26100500001942767719` on the first poll.
-- **Share-ratio balance reconciliation**: After the first swap, `baw wallet balance` showed `0.00851201289192116` `NVDAB`, while `eth_call` `balanceOf(0x34dAAbcAba08A9365C229e2Ac7b25C14c6a6b730)` returned `8505393792444895` wei (`0.0085053938` raw tokens; `0.008505393792444894 * 1.0007782237528078 = 0.00851201289192116`). After the second swap (`+0.008427629564723702` shares), `baw wallet balance` shows `0.016939642456644862` `NVDAB` and `eth_call` `balanceOf` returns `16926469875736378` wei (`0.016926469875736379` raw tokens; `0.016926469875736379 * 1.0007782237528078 = 0.016939642456644862`).
-
+- Technical docs site: `docs-site/` (`npm --prefix docs-site run docs:dev`)
+- Binance Web3 DevEx evidence ledger: [`docs/devex-evidence.md`](docs/devex-evidence.md)
+- On-chain receipt files: [`docs/live_swap_nvda_2usd.json`](docs/live_swap_nvda_2usd.json), [`docs/live_swap_nvda_2usd_second_2026-10-05.json`](docs/live_swap_nvda_2usd_second_2026-10-05.json)

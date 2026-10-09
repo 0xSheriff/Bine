@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
+  base: '/docs/',
   title: 'BINE',
   description: 'Pre-trade safety check for tokenized stocks on BNB Smart Chain (chainId 56).',
   appearance: true,

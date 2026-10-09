@@ -1,0 +1,44 @@
+# BINE Production Caddyfile Fragment
+# Domain is parameterized via BINE_HOST environment variable (defaults to localhost).
+# Place in /etc/caddy/Caddyfile or import into your main Caddy configuration.
+
+{$BINE_HOST:localhost} {
+    # Compression for all responses
+    encode gzip zstd
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    # API Proxy to FastAPI daemon on 127.0.0.1:8000
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # Documentation site served under /docs/
+    redir /docs /docs/
+    handle_path /docs/* {
+        root * /srv/bine/docs-site/.vitepress/dist
+        try_files {path} {path}.html {path}/index.html /index.html
+        file_server
+    }
+
+    # Frontend Single Page Application (SPA)
+    handle {
+        root * /srv/bine/frontend/dist
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Access logging
+    log {
+        output file /var/log/caddy/bine.access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}

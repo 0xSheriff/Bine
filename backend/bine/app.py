@@ -121,8 +121,32 @@ def reset_rate_limits() -> None:
     _RATE_BUCKETS.clear()
 
 
+def _extract_client_ip(request: Request) -> str:
+    peer_ip = (request.client.host if request.client else None) or "local"
+    if peer_ip == "local":
+        return "local"
+    try:
+        settings = get_settings()
+        trusted = {ip.strip() for ip in settings.trusted_proxies.split(",") if ip.strip()}
+    except Exception:
+        trusted = {"127.0.0.1", "::1"}
+
+    if peer_ip in trusted:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            first_hop = xff.split(",")[0].strip()
+            if first_hop:
+                return first_hop
+        x_real_ip = request.headers.get("x-real-ip")
+        if x_real_ip:
+            rip = x_real_ip.strip()
+            if rip:
+                return rip
+    return peer_ip
+
+
 def _check_rate_limit(request: Request, bucket_prefix: str, max_per_minute: int) -> None:
-    client_ip = (request.client.host if request.client else None) or "local"
+    client_ip = _extract_client_ip(request)
     key = f"{bucket_prefix}:{client_ip}"
     now = _time.monotonic()
     window = _RATE_BUCKETS[key]
@@ -134,6 +158,14 @@ def _check_rate_limit(request: Request, bucket_prefix: str, max_per_minute: int)
             detail=f"Rate limit exceeded ({max_per_minute} requests per minute). Please wait briefly.",
         )
     window.append(now)
+
+
+def _is_public_demo_or_vercel(settings: Settings) -> bool:
+    return bool(
+        os.environ.get("VERCEL")
+        or settings.bine_public_demo
+        or os.environ.get("BINE_PUBLIC_DEMO", "").strip().lower() in ("1", "true", "yes")
+    )
 
 
 @asynccontextmanager
@@ -322,11 +354,13 @@ async def health() -> dict[str, Any]:
             count, oldest, newest = result.one()
     except Exception as exc:
         logger.warning("health DB query failed: %s", exc)
-    effective_live = False if os.environ.get("VERCEL") else bool(settings.bine_live_mode)
+    effective_live = False if _is_public_demo_or_vercel(settings) else bool(settings.bine_live_mode)
+    has_keys = bool(settings.binance_api_key.strip() and settings.binance_secret_key.strip())
     return {
         "status": "ok",
         "schema_version": SCHEMA_VERSION,
         "live_mode": effective_live,
+        "binance_credentials_present": has_keys,
         "max_trade_usd": settings.bine_max_trade_usd,
         "daily_cap_usd": settings.bine_daily_cap_usd,
         "sample_count": count or 0,
@@ -524,11 +558,11 @@ async def execute_stock_trade(
     _check_rate_limit(request, "execute", EXECUTE_RATE_LIMIT_PER_MIN)
     settings = get_settings()
     maybe_enable_dev_dns_fallback(settings.dev_dns_fallback)
-    on_vercel = bool(os.environ.get("VERCEL"))
-    effective_live = False if on_vercel else bool(settings.bine_live_mode)
+    demo_locked = _is_public_demo_or_vercel(settings)
+    effective_live = False if demo_locked else bool(settings.bine_live_mode)
 
     supplied_token = x_bine_admin_token if x_bine_admin_token is not None else req.admin_token
-    if req.execute_live and not on_vercel:
+    if req.execute_live and not demo_locked:
         if not settings.bine_admin_token or not supplied_token or not hmac.compare_digest(
             supplied_token, settings.bine_admin_token
         ):
@@ -579,7 +613,7 @@ async def execute_stock_trade(
                 settings=settings,
                 execute_live=req.execute_live,
                 admin_token=supplied_token,
-                require_admin_token=req.execute_live and not on_vercel,
+                require_admin_token=req.execute_live and not demo_locked,
             )
 
 

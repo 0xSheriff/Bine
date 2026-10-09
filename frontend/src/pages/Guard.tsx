@@ -34,9 +34,9 @@ export { GUARD_RULE_DEFINITIONS }
 const MAX_QUOTE_USD = 2500.0
 
 const EXAMPLE_PRESETS = [
-  { label: 'NVDA $5.50 buy', ticker: 'NVDA', amount: 5.5, badge: 'BUY' },
-  { label: 'SPYon $250 refusal', ticker: 'SPYon', amount: 250, badge: 'REFUSE' },
-  { label: 'AAPL $2 below minimum', ticker: 'AAPL', amount: 2, badge: 'MIN' },
+  { label: 'NVDA $5.50', ticker: 'NVDA', amount: 5.5, badge: '$5.50' },
+  { label: 'SPYon $250', ticker: 'SPYon', amount: 250, badge: '$250' },
+  { label: 'AAPL $2.00', ticker: 'AAPL', amount: 2, badge: '$2.00' },
 ] as const
 
 const QUICK_AMOUNTS = [2, 5.5, 25, 250] as const
@@ -1441,6 +1441,34 @@ DEV_DNS_FALLBACK=true backend/.venv/bin/uvicorn bine.app:app --app-dir backend -
                         </p>
                       )}
                     </div>
+
+                    {/* Recorded result comparison panel when live verdict differs from Oct 6 BUY snapshot */}
+                    {quote.ticker.toUpperCase() === 'NVDA' && Math.abs(quote.amount_usd - 5.5) < 0.01 && (
+                      <div
+                        className="p-4 rounded-2xl space-y-1.5"
+                        style={{
+                          backgroundColor: 'var(--surface-subtle)',
+                          border: '1px solid var(--hairline)',
+                        }}
+                        role="region"
+                        aria-label="Recorded result comparison"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold uppercase"
+                            style={{ backgroundColor: 'var(--chip-good-bg)', color: 'var(--good)' }}
+                          >
+                            Recorded BUY
+                          </span>
+                          <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                            2026-10-06 15:04 UTC [16:04 WAT]
+                          </span>
+                        </div>
+                        <p className="text-xs m-0 leading-relaxed" style={{ color: 'var(--text)' }}>
+                          On Oct 6 during US market hours, this trade evaluated as a BUY (0.023988 shares at $229.72 all-in per share via Ondo). Live market results change dynamically with BNB Chain DEX pool depth.
+                        </p>
+                      </div>
+                    )}
 
                     {/* What to try instead */}
                     <div className="flex flex-wrap items-center gap-3">

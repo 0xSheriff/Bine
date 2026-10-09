@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     bine_daily_cap_usd: float = 10.00
     bine_admin_token: str = ""
 
+    # Public demo lock: forces live mode off and execute endpoint to dry-run only
+    bine_public_demo: bool = False
+
+    # Trusted reverse proxy IPs/CIDRs for client IP rate limiting (comma-separated)
+    trusted_proxies: str = "127.0.0.1,::1"
+
     # CORS origins (comma-separated)
     bine_cors_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173,"
@@ -42,8 +48,16 @@ class Settings(BaseSettings):
     bsc_chain_id: str = "56"
 
     @model_validator(mode="after")
-    def _force_live_mode_off_on_vercel(self) -> "Settings":
-        if os.environ.get("VERCEL"):
+    def _sanitize_and_lock(self) -> "Settings":
+        if isinstance(self.binance_api_key, str):
+            self.binance_api_key = self.binance_api_key.strip()
+        if isinstance(self.binance_secret_key, str):
+            self.binance_secret_key = self.binance_secret_key.strip()
+        if (
+            os.environ.get("VERCEL")
+            or self.bine_public_demo
+            or os.environ.get("BINE_PUBLIC_DEMO", "").strip().lower() in ("1", "true", "yes")
+        ):
             self.bine_live_mode = False
         return self
 

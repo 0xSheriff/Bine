@@ -750,10 +750,14 @@ async def execute_trade_pipeline(
         expected_address=winner.token_contract_address,
     )
 
-    on_vercel = bool(os.environ.get("VERCEL"))
-    effective_live_mode = False if on_vercel else bool(settings.bine_live_mode)
+    is_demo_locked = bool(
+        os.environ.get("VERCEL")
+        or getattr(settings, "bine_public_demo", False)
+        or os.environ.get("BINE_PUBLIC_DEMO", "").strip().lower() in ("1", "true", "yes")
+    )
+    effective_live_mode = False if is_demo_locked else bool(settings.bine_live_mode)
 
-    check_admin = (not on_vercel) and (require_admin_token or bool(settings.bine_admin_token))
+    check_admin = (not is_demo_locked) and (require_admin_token or bool(settings.bine_admin_token))
     admin_ok = (
         not check_admin
         or (
@@ -779,13 +783,14 @@ async def execute_trade_pipeline(
             baw_command=baw_preview_cmd,
             detail=sim_res.summary,
         )
-    elif on_vercel:
+    elif is_demo_locked:
+        platform_label = "Vercel" if os.environ.get("VERCEL") else "public demo"
         exec_res = LiveExecutionResult(
             attempted=False,
             live_mode_enabled=False,
             status="LIVE_DISABLED",
             baw_command=baw_preview_cmd,
-            detail="Simulation passed, but live trading is off (BINE_LIVE_MODE=false; Vercel deployment is dry-run only).",
+            detail=f"Simulation passed, but live trading is off (BINE_LIVE_MODE=false; {platform_label} deployment is dry-run only).",
         )
     elif not admin_ok:
         exec_res = LiveExecutionResult(

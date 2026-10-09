@@ -108,6 +108,7 @@ export interface HealthResponse {
   status: string
   schema_version: string
   live_mode: boolean
+  binance_credentials_present?: boolean
   max_trade_usd: number
   daily_cap_usd: number
   sample_count: number

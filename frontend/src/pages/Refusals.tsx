@@ -1,17 +1,24 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchQuote, fetchTickers } from '../api'
+import { fetchHealth, fetchQuote, fetchTickers } from '../api'
 import { usePrefersReducedMotion } from '../components/BineLogo'
 import { GlassDetailPanel, runGlassViewTransition } from '../components/GlassStack'
 import {
   Footer,
   TopHeader,
-  formatAbsoluteAndRelative,
   formatSecondsAgo,
   navigateApp,
 } from '../components/shared'
 import recordedRefusals from '../data/recorded-refusals.json'
-import { GUARD_RULE_DEFINITIONS, GUARD_RULES_COUNT, humanizeCode, humanizeStatus } from '../lib/humanize'
+import {
+  GUARD_RULE_DEFINITIONS,
+  GUARD_RULES_COUNT,
+  deriveSessionFromUtc,
+  formatUtcAndWat,
+  getLiveMarketSession,
+  humanizeCode,
+  humanizeStatus,
+} from '../lib/humanize'
 import type { QuoteVerdictResponse } from '../types'
 
 export default function Refusals() {
@@ -24,6 +31,12 @@ export default function Refusals() {
 
   const ruleTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const cardTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+
+  const { data: health } = useQuery({
+    queryKey: ['health'],
+    queryFn: fetchHealth,
+    staleTime: 30_000,
+  })
 
   const { data: catalog } = useQuery({
     queryKey: ['tickers'],
@@ -59,8 +72,7 @@ export default function Refusals() {
     }
   }
 
-  const sessionStatus = humanizeStatus(sessionSample?.market?.status || 'regular')
-  const sessionOpen = sessionSample?.market?.open ?? true
+  const liveSession = getLiveMarketSession()
 
   const activeRule = openRuleCode ? GUARD_RULE_DEFINITIONS[openRuleCode] : null
   const activeRuleTriggerRef = {
@@ -97,16 +109,17 @@ export default function Refusals() {
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{
-                    backgroundColor: sessionOpen ? 'var(--good)' : 'var(--warn)',
+                    backgroundColor: liveSession.isRegular ? 'var(--good)' : 'var(--warn)',
                   }}
                 />
                 <div className="text-xs font-mono">
                   <div className="font-semibold" style={{ color: 'var(--text)' }}>
-                    Live BSC session: {sessionStatus} ({sessionOpen ? 'open' : 'paused'})
+                    Live session: {liveSession.label}
                   </div>
                   <div style={{ color: 'var(--text-secondary)' }}>
-                    {catalog?.count ?? 448} catalog tickers loaded
-                    {sessionSample?.quoted_at ? ` · checked ${formatSecondsAgo(sessionSample.quoted_at)}` : ''}
+                    {catalog?.count ?? 448} tokens watched
+                    {sessionSample?.quoted_at ? ` · quote ${formatSecondsAgo(sessionSample.quoted_at)}` : ''}
+                    {health?.binance_credentials_present ? ' · Binance API ready' : ''}
                   </div>
                 </div>
               </div>
@@ -211,11 +224,45 @@ export default function Refusals() {
               )}
             </section>
 
+            {/* Live now strip */}
+            <div
+              className="bine-card p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
+              style={{
+                backgroundColor: 'var(--surface-subtle)',
+                border: '1px solid var(--hairline)',
+              }}
+              role="region"
+              aria-label="Live market status strip"
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: liveSession.isRegular ? 'var(--good)' : 'var(--warn)' }}
+                />
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                    Live now: {liveSession.label}
+                  </div>
+                  <div className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                    {catalog?.count ?? 448} tokens watched
+                    {sessionSample?.quoted_at ? ` · last live check ${formatSecondsAgo(sessionSample.quoted_at)}` : ''}
+                    {' · '}
+                    {health?.binance_credentials_present ? 'Binance API connected' : 'Demo mode'}
+                    {' · '}
+                    {health?.live_mode ? 'Live execution enabled' : 'Live execution disabled (dry-run only)'}
+                  </div>
+                </div>
+              </div>
+              <div className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                Recorded cards below are frozen snapshots.
+              </div>
+            </div>
+
             {/* 2. Recorded Evidence Cards + One-at-a-Time Live Verification */}
             <section aria-labelledby="recorded-evidence-heading" className="space-y-4">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 id="recorded-evidence-heading" className="text-lg font-semibold m-0">
-                  Recorded refusal evidence ({recordedRefusals.length})
+                  Recorded evidence (static snapshots) ({recordedRefusals.length})
                 </h2>
                 <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                   Click &ldquo;Inspect details&rdquo; or &ldquo;Run live now&rdquo; on any card (one open at a time).
@@ -241,6 +288,8 @@ export default function Refusals() {
                     },
                   }
 
+                  const derivedSession = deriveSessionFromUtc(item.recorded_at)
+
                   return (
                     <article
                       key={item.id}
@@ -262,7 +311,10 @@ export default function Refusals() {
                               {item.ticker} ({item.token_symbol}) · ${item.amount_usd.toFixed(2)}
                             </span>
                             <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-                              {formatAbsoluteAndRelative(item.recorded_at)} · {humanizeStatus(item.market_status)}
+                              <span>{formatUtcAndWat(item.recorded_at)}</span>
+                              <span className="block sm:inline sm:ml-2 opacity-80">
+                                {formatSecondsAgo(item.recorded_at)} · {humanizeStatus(derivedSession)}
+                              </span>
                             </span>
                           </div>
 
@@ -335,7 +387,7 @@ export default function Refusals() {
                           }, reducedMotion)
                         }
                         title={`${item.ticker} (${item.token_symbol}) · ${item.rule_label}`}
-                        subtitle={`Recorded ${formatAbsoluteAndRelative(item.recorded_at)} · Issuer ${item.issuer}`}
+                        subtitle={`Recorded ${formatUtcAndWat(item.recorded_at)} · Issuer ${item.issuer}`}
                         triggerRef={cardTriggerRef}
                       >
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">

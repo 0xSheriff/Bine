@@ -30,12 +30,17 @@ export const STATUS_LABELS: Record<string, string> = {
   LOAD_ERROR: 'Load error',
   REGULAR: 'Regular hours',
   OPEN: 'Market open',
-  CLOSED: 'Market closed',
-  PAUSED: 'Market paused',
-  MARKET_PAUSED: 'Market paused',
+  CLOSED: 'Session closed',
+  PAUSED: 'Session closed',
+  MARKET_PAUSED: 'Session closed',
   PRE_MARKET: 'Pre-market',
   AFTER_HOURS: 'After hours',
   OVERNIGHT: 'Overnight session',
+  regular: 'Regular hours',
+  'regular hours': 'Regular hours',
+  'after hours': 'After hours',
+  offhours: 'After hours',
+  overnight: 'Overnight session',
   amm_pools: 'AMM pools',
   pmm_rfq_24h_volume: '24h RFQ volume',
   catalog_volume_24h: '24h catalog volume',
@@ -149,5 +154,61 @@ export const GUARD_RULE_DEFINITIONS: Record<
 };
 
 export const GUARD_RULES_COUNT = Object.keys(GUARD_RULE_DEFINITIONS).length;
+
+/**
+ * Derive session tag strictly from UTC timestamp.
+ * US regular hours: Monday-Friday 13:30 to 20:00 UTC.
+ * All other times are after hours.
+ */
+export function deriveSessionFromUtc(isoString: string): 'regular hours' | 'after hours' {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return 'after hours';
+  const day = d.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+  if (day >= 1 && day <= 5) {
+    const minutes = d.getUTCHours() * 60 + d.getUTCMinutes();
+    if (minutes >= 810 && minutes < 1200) {
+      return 'regular hours';
+    }
+  }
+  return 'after hours';
+}
+
+/**
+ * Format timestamp in UTC with West Africa Time (WAT = UTC+1) in brackets,
+ * e.g. "2026-10-05 15:04 UTC [16:04 WAT]".
+ */
+export function formatUtcAndWat(isoString: string): string {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return isoString;
+
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hhUtc = String(d.getUTCHours()).padStart(2, '0');
+  const minUtc = String(d.getUTCMinutes()).padStart(2, '0');
+
+  // WAT is UTC + 1 hour
+  const watDate = new Date(d.getTime() + 60 * 60 * 1000);
+  const hhWat = String(watDate.getUTCHours()).padStart(2, '0');
+  const minWat = String(watDate.getUTCMinutes()).padStart(2, '0');
+
+  return `${yyyy}-${mm}-${dd} ${hhUtc}:${minUtc} UTC [${hhWat}:${minWat} WAT]`;
+}
+
+/**
+ * Live US market session status computed live from current UTC time.
+ */
+export function getLiveMarketSession(nowDate: Date = new Date()): {
+  isRegular: boolean;
+  label: string;
+} {
+  const day = nowDate.getUTCDay();
+  const minutes = nowDate.getUTCHours() * 60 + nowDate.getUTCMinutes();
+  const isRegular = day >= 1 && day <= 5 && minutes >= 810 && minutes < 1200;
+  return {
+    isRegular,
+    label: isRegular ? 'US regular trading hours' : 'US market after-hours / closed',
+  };
+}
 
 

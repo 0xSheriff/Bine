@@ -135,8 +135,8 @@ class BinanceClient:
         timeout: float = TIMEOUT_S,
         max_retries: int = MAX_RETRIES,
     ):
-        self._api_key = api_key
-        self._secret_key = secret_key
+        self._api_key = api_key.strip()
+        self._secret_key = secret_key.strip()
         self._max_retries = max_retries
         self._http = httpx.AsyncClient(
             base_url=BASE_URL,
@@ -285,9 +285,17 @@ class BinanceClient:
                     )
 
                 if resp.status_code in (401, 403):
+                    err_code = int(data.get("code") or 40101)
+                    err_msg = str(data.get("msg") or "Binance API keys missing or rejected")
+                    logger.warning(
+                        "Binance API auth error: HTTP %d, code=%s, msg=%s",
+                        resp.status_code,
+                        err_code,
+                        err_msg,
+                    )
                     raise AuthError(
-                        int(data.get("code") or 40101),
-                        str(data.get("msg") or "Binance API keys missing or rejected"),
+                        err_code,
+                        err_msg,
                         status_code=resp.status_code,
                     )
 
@@ -297,11 +305,20 @@ class BinanceClient:
                 # Business-level rate limit (code 42900 inside HTTP 200)
                 if code == 42900:
                     retry_after = float(resp.headers.get("Retry-After", backoff))
+                    logger.warning("Binance business rate limit: code=42900, retry_after=%.1fs", retry_after)
                     if attempt < self._max_retries:
                         await self._sleep(retry_after)
                         backoff *= 2
                         continue
                     raise RateLimitError(code, msg, retry_after=retry_after)
+
+                if code != 0:
+                    logger.warning(
+                        "Binance API business error: HTTP %d, code=%s, msg=%s",
+                        resp.status_code,
+                        code,
+                        msg,
+                    )
 
                 # Raise typed errors for non-zero codes
                 raise_for_code(code, msg, status_code=resp.status_code)

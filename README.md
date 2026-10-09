@@ -16,7 +16,7 @@ $ bine check AAPL 2
 DO NOT BUY: Ondo requires at least $5 per order. Try $5.50.
 
 $ bine check NVDA 5.50
-BUY NVDAB (bStocks) - about 0.2% over the stock reference price.
+BUY NVDAB (bStocks) - about 0.2% over the stock reference price (recorded BUY Oct 6; live results change with pool depth).
 
 $ bine check SPYon 250   # outside US market hours
 DO NOT BUY: pool is thin right now; fill is 40% to 82% above the stock price.

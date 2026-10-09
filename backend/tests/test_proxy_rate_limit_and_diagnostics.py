@@ -114,3 +114,25 @@ def test_binance_credentials_present_in_health(monkeypatch: pytest.MonkeyPatch) 
     client_empty = TestClient(app)
     resp_empty = client_empty.get("/api/health")
     assert resp_empty.json()["binance_credentials_present"] is False
+
+
+def test_api_recent_endpoint() -> None:
+    client = TestClient(app)
+    resp = client.get("/api/recent?hours=24&limit=10")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "count" in data
+    assert data["hours"] == 24
+    assert "checks" in data
+    assert isinstance(data["checks"], list)
+
+
+def test_cli_probe_command_parsing() -> None:
+    from bine.cli import build_parser
+
+    parser = build_parser()
+    args = parser.parse_args(["probe", "--tickers", "NVDA,SPY", "5.50", "--scheduled"])
+    assert args.command == "probe"
+    assert args.scheduled is True
+    assert args.tickers == "NVDA,SPY"
+    assert args.amount_usd == 5.50

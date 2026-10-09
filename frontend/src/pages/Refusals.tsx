@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchHealth, fetchQuote, fetchTickers } from '../api'
+import { fetchHealth, fetchQuote, fetchRecentChecks, fetchTickers } from '../api'
 import { usePrefersReducedMotion } from '../components/BineLogo'
 import { GlassDetailPanel, runGlassViewTransition } from '../components/GlassStack'
 import {
@@ -49,6 +49,12 @@ export default function Refusals() {
     queryKey: ['quote-session-banner'],
     queryFn: () => fetchQuote('NVDA', 5.5, false),
     staleTime: 60_000,
+  })
+
+  const { data: recentChecksData } = useQuery({
+    queryKey: ['recentChecks'],
+    queryFn: () => fetchRecentChecks(24, 20),
+    staleTime: 30_000,
   })
 
   const handleRunLive = async (id: string, ticker: string, amountUsd: number) => {
@@ -471,6 +477,81 @@ export default function Refusals() {
                   )
                 })}
               </div>
+            </section>
+
+            {/* 3. Last 24 hours (live checks) */}
+            <section aria-labelledby="recent-checks-heading" className="space-y-4">
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <h2 id="recent-checks-heading" className="text-lg font-semibold m-0">
+                  Last 24 hours (live) ({recentChecksData?.checks.length ?? 0})
+                </h2>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Automated background probe checks recorded by the server.
+                </span>
+              </div>
+
+              {!recentChecksData || recentChecksData.checks.length === 0 ? (
+                <div
+                  className="bine-card p-5 text-sm text-center"
+                  style={{
+                    backgroundColor: 'var(--surface-subtle)',
+                    border: '1px solid var(--hairline)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  No automated probe checks recorded in the last 24 hours. The scheduled probe timer runs periodically on the VPS.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentChecksData.checks.map(check => {
+                    const isBuy = check.verdict === 'BUY'
+                    const actionLabel = humanizeCode(check.action || 'scheduled')
+                    const refusalLabel = check.refusal_code ? humanizeCode(check.refusal_code) : null
+
+                    return (
+                      <article
+                        key={check.id}
+                        className="bine-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono"
+                        style={{
+                          backgroundColor: 'var(--surface-subtle)',
+                          border: '1px solid var(--hairline)',
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                            style={{
+                              backgroundColor: isBuy ? 'var(--chip-good-bg)' : 'var(--chip-bad-bg)',
+                              color: isBuy ? 'var(--good)' : 'var(--bad)',
+                            }}
+                          >
+                            {isBuy ? 'BUY' : 'REFUSE'}
+                          </span>
+                          <div>
+                            <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>
+                              {check.ticker}
+                              {check.recommended_symbol ? ` (${check.recommended_symbol})` : ''}
+                            </span>
+                            <span className="ml-2" style={{ color: 'var(--text-secondary)' }}>
+                              ${check.amount_usd.toFixed(2)} · {actionLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:items-end text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          <div>
+                            {refusalLabel && <span className="font-semibold mr-2">{refusalLabel}</span>}
+                            <span>{formatSecondsAgo(check.created_at)}</span>
+                          </div>
+                          <div className="opacity-80">
+                            {formatUtcAndWat(check.created_at)}
+                          </div>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
             </section>
           </div>
         </div>

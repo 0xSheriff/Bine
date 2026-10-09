@@ -19,7 +19,7 @@ import os
 import time as _time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Literal
 
@@ -668,6 +668,54 @@ async def list_decisions(
             }
         )
     return {"count": len(items), "decisions": items}
+
+
+@app.get("/api/recent")
+async def recent_checks(
+    request: Request,
+    limit: int = Query(50, ge=1, le=200),
+    hours: int = Query(24, ge=1, le=168),
+) -> dict[str, Any]:
+    """Return live and scheduled market checks from the last 24 hours."""
+    _check_rate_limit(request, "recent", QUOTE_RATE_LIMIT_PER_MIN)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    try:
+        async with AsyncSessionLocal() as session:
+            q = (
+                select(DecisionLog)
+                .where(DecisionLog.created_at >= cutoff)
+                .order_by(DecisionLog.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(q)
+            rows = list(result.scalars().all())
+    except Exception as exc:
+        logger.warning("recent_checks DB query failed (returning empty list): %s", exc)
+        return {"count": 0, "hours": hours, "checks": []}
+
+    checks = []
+    for r in rows:
+        checks.append(
+            {
+                "id": r.id,
+                "created_at": _iso_utc(r.created_at),
+                "ticker": r.ticker,
+                "amount_usd": r.amount_usd,
+                "action": r.action,
+                "verdict": r.verdict,
+                "recommended_platform": r.recommended_platform,
+                "recommended_symbol": r.recommended_symbol,
+                "recommended_contract_address": r.recommended_contract_address,
+                "refusal_code": r.refusal_code,
+                "reason": r.reason,
+                "expected_shares": r.expected_shares,
+                "all_in_price_per_share_usd": r.all_in_price_per_share_usd,
+                "all_in_vs_reference_pct": r.all_in_vs_reference_pct,
+                "effective_slippage_pct": r.effective_slippage_pct,
+                "tx_hash": r.tx_hash,
+            }
+        )
+    return {"count": len(checks), "hours": hours, "checks": checks}
 
 
 @app.get("/api/decisions/{decision_id}")

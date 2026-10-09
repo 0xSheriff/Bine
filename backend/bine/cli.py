@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
 from typing import Any
@@ -23,6 +24,7 @@ from bine.config import Settings, get_settings
 from bine.database import AsyncSessionLocal, init_db
 from bine.errors import AuthError
 from bine.execution import build_baw_swap_command_from_quote, execute_trade_pipeline
+from bine.models import DecisionLog
 from bine.quote_engine import (
     DEFAULT_QUOTE_WALLET,
     build_verdict,
@@ -306,6 +308,102 @@ def _cmd_buy(args: argparse.Namespace) -> int:
     return 0 if live_exec.get("status") == "LIVE_SUBMITTED" else 2
 
 
+DEFAULT_PROBE_TICKERS = ["NVDA", "SPY", "AAPL", "KLAC", "NFLX", "PPLT", "CVNA", "NOW"]
+
+
+async def run_probe(
+    tickers: list[str] | None = None,
+    amount_usd: float = 5.50,
+    *,
+    scheduled: bool = False,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Probe a list of tickers, evaluate pre-trade guard, and record to DecisionLog."""
+    target_tickers = tickers or DEFAULT_PROBE_TICKERS
+    cfg = settings or get_settings()
+    results: list[dict[str, Any]] = []
+    action_label = "scheduled" if scheduled else "probe"
+
+    for ticker in target_tickers:
+        ticker_clean = ticker.strip().upper()
+        try:
+            quote = await run_check(ticker_clean, amount_usd, settings=cfg, include_details=True)
+            verdict = quote.get("verdict", "UNKNOWN")
+            refusal = quote.get("refusal") or {}
+            refusal_code = refusal.get("code")
+            reason = refusal.get("message") or format_plain_check_line(quote)
+            token = quote.get("token") or {}
+
+            # Record into DecisionLog
+            try:
+                await init_db()
+                async with AsyncSessionLocal() as session:
+                    log_entry = DecisionLog(
+                        ticker=ticker_clean,
+                        amount_usd=amount_usd,
+                        action=action_label,
+                        verdict=verdict,
+                        recommended_platform=token.get("issuer"),
+                        recommended_symbol=token.get("symbol"),
+                        recommended_contract_address=token.get("address"),
+                        refusal_code=refusal_code,
+                        reason=reason,
+                        expected_shares=quote.get("shares"),
+                        all_in_price_per_share_usd=quote.get("all_in_price_per_share"),
+                        all_in_vs_reference_pct=quote.get("spread_pct"),
+                        effective_slippage_pct=quote.get("slippage_pct"),
+                        quote_id=None,
+                        execution_mode=None,
+                        simulation_ran=False,
+                        execution_status="DRY_RUN_ONLY",
+                        payload_json=json.dumps({"quote": quote}),
+                    )
+                    session.add(log_entry)
+                    await session.commit()
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Failed to record probe into decision_log: %s", exc)
+
+            results.append(
+                {
+                    "ticker": ticker_clean,
+                    "amount_usd": amount_usd,
+                    "verdict": verdict,
+                    "refusal_code": refusal_code,
+                    "summary": format_plain_check_line(quote),
+                }
+            )
+        except Exception as exc:
+            results.append(
+                {
+                    "ticker": ticker_clean,
+                    "amount_usd": amount_usd,
+                    "verdict": "ERROR",
+                    "refusal_code": "error",
+                    "summary": f"Probe error for {ticker_clean}: {exc}",
+                }
+            )
+        # Gentle pacing between probes
+        await asyncio.sleep(0.5)
+
+    return results
+
+
+def _cmd_probe(args: argparse.Namespace) -> int:
+    settings = get_settings()
+    tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()] if args.tickers else None
+    results = asyncio.run(
+        run_probe(
+            tickers=tickers,
+            amount_usd=args.amount_usd,
+            scheduled=args.scheduled,
+            settings=settings,
+        )
+    )
+    for r in results:
+        print(f"[{r['verdict']}] {r['ticker']}: {r['summary']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bine",
@@ -325,6 +423,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_buy.add_argument("amount_usd", type=float, nargs="?", default=5.50, help="USD order amount (default: 5.50)")
     p_buy.add_argument("-y", "--yes", action="store_true", help="Skip interactive confirmation prompt")
     p_buy.set_defaults(func=_cmd_buy)
+
+    p_probe = sub.add_parser("probe", help="Run scheduled market checks across representative tickers")
+    p_probe.add_argument("--scheduled", action="store_true", help="Mark probe action as scheduled")
+    p_probe.add_argument("--tickers", type=str, default="", help="Comma-separated ticker list")
+    p_probe.add_argument("amount_usd", type=float, nargs="?", default=5.50, help="USD order amount (default: 5.50)")
+    p_probe.set_defaults(func=_cmd_probe)
 
     return parser
 

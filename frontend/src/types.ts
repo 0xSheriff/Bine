@@ -207,3 +207,29 @@ export interface DecisionListResponse {
   count: number
   decisions: DecisionLogEntry[]
 }
+
+export interface RecentCheckItem {
+  id: number
+  created_at: string
+  ticker: string
+  amount_usd: number
+  action: string
+  verdict: 'BUY' | 'REFUSE' | string
+  recommended_platform: string | null
+  recommended_symbol: string | null
+  recommended_contract_address?: string | null
+  refusal_code: string | null
+  reason: string
+  expected_shares: number | null
+  all_in_price_per_share_usd: number | null
+  all_in_vs_reference_pct: number | null
+  effective_slippage_pct?: number | null
+  tx_hash: string | null
+}
+
+export interface RecentChecksResponse {
+  count: number
+  hours: number
+  checks: RecentCheckItem[]
+}
+

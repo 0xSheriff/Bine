@@ -111,6 +111,13 @@ if [[ -f "${SCRIPT_DIR}/bine-api.service" ]]; then
   systemctl enable bine-api
   echo "Installed /etc/systemd/system/bine-api.service."
 fi
+if [[ -f "${SCRIPT_DIR}/bine-probe.service" ]] && [[ -f "${SCRIPT_DIR}/bine-probe.timer" ]]; then
+  cp "${SCRIPT_DIR}/bine-probe.service" /etc/systemd/system/bine-probe.service
+  cp "${SCRIPT_DIR}/bine-probe.timer" /etc/systemd/system/bine-probe.timer
+  systemctl daemon-reload
+  systemctl enable bine-probe.timer
+  echo "Installed /etc/systemd/system/bine-probe.timer (optional background probe)."
+fi
 
 echo "=== Step 8: Configure environment template ==="
 if [[ ! -f /etc/bine/bine.env ]]; then

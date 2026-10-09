@@ -4,6 +4,7 @@ import type {
   ExecuteTradeResponse,
   HealthResponse,
   QuoteVerdictResponse,
+  RecentChecksResponse,
   TickerListResponse,
 } from './types'
 
@@ -38,3 +39,6 @@ export const executeTrade = (
 
 export const fetchDecisions = (limit = 5, live_only = false): Promise<DecisionListResponse> =>
   api.get('/decisions', { params: { limit, live_only } }).then(r => r.data)
+
+export const fetchRecentChecks = (hours = 24, limit = 50): Promise<RecentChecksResponse> =>
+  api.get('/recent', { params: { hours, limit } }).then(r => r.data)

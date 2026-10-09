@@ -142,11 +142,55 @@
 - **`SPYon` Reproducible `+40.75%`–`+82.07%` Spread at `$250` Off-Hours vs. `+0.0037%` Regular Hours**: Off-hours, `SPYon` executes near reference at `$25` and `$100` on `PancakeSwap V3`, then jumps to `+40.75%`–`+82.07%` above reference at `$250` across all runs (caught deterministically by `slippage_too_high`). During US regular trading hours (`marketStatus = "regular"`), `SPYon` routes through `Ondo RWA` at `+0.0037%` (`+0.37 bps`).
 - **Local DNS**: Pass `DEV_DNS_FALLBACK=true` on local networks where default DNS times out on `web3.binance.com`.
 
+- **2026-10-09 (VPS Deploy Kit, Truthfulness Fixes & Egress Verification on `vps-and-fixes` cut from `master`)**:
+  - **Phase 1 (Diagnosis Settled)**:
+    - 3 sequential runs 30s apart proved that local `bine check NVDA 5.50` returns **BUY** (`eligible=True` for Ondo via LiquidMesh/Uniswap V4 at $229.72 and bStocks at $229.99) while hosted Vercel returns **REFUSE (`depth_thin`)** (`route=None`).
+    - Raw pool depth metrics match identically ($7.87M AMM pool liquidity for NVDAB across 15 pools; $19.37B 24h volume for NVDAon across 9 pools). Refusal is hosted-only.
+    - Discovered that `request.client.host` rate limiting in `app.py` created a single global lock across all clients behind Vercel or reverse proxies.
+  - **Phase 2 (Truthfulness & Key Diagnostics, commit `c448288`)**:
+    - Created `deriveSessionFromUtc()` (US regular hours: 13:30–20:00 UTC Mon–Fri) and `formatUtcAndWat()` (`2026-10-05 15:04 UTC [16:04 WAT]`).
+    - Cleaned `recorded-refusals.json`: mapped SPYon and ENLV to `after hours` instead of `PAUSED` or `REGULAR`, and updated `Refusals.tsx` with a live market status strip.
+    - Updated `Guard.tsx` example chips to neutral labels without "buy" or "refusal", and added an Oct 6 recorded baseline panel when live market verdict differs from the snapshot.
+    - Added `_extract_client_ip()` gating `X-Forwarded-For` and `X-Real-IP` behind `trusted_proxies` (default `127.0.0.1,::1`).
+    - Added whitespace stripping to Binance API keys in `config.py` and `client.py`, and added `binance_credentials_present: bool` to `/api/health`.
+    - Added `BINE_PUBLIC_DEMO=true` lock forcing live mode off and `/api/execute` dry-run only.
+  - **Phase 3 (Hardened Production VPS Deploy Kit, commit `f028e6f`)**:
+    - Created `deploy/README.md` (ordered guide for Ubuntu 22.04/24.04).
+    - Created `deploy/bootstrap.sh` (idempotent: deploy user, ufw 22/80/443, fail2ban, unattended-upgrades, nodejs, caddy, systemd).
+    - Created `deploy/bine-api.service` (systemd unit: User=deploy, WorkingDirectory=/srv/bine/backend, uvicorn with proxy headers).
+    - Created `deploy/Caddyfile.bine` (`{$BINE_HOST:localhost}`, `/api/*` reverse proxy, static SPA fallback, `/docs/*` static docs, gzip/zstd, security headers).
+    - Added `base: '/docs/'` to `docs-site/.vitepress/config.mts` and verified clean build.
+    - Created `deploy/bine.env.example` (template with zero secrets).
+    - Created `deploy/check_egress.sh` (unauthenticated probe returning HTTP 401 for reachability, with DNS diagnostic fallback).
+    - Created `deploy/deploy.sh` (git pull, npm build, pip install, systemctl restart, health check polling, automatic rollback).
+  - **Phase 4 (Background Probe Timer & `/api/recent`, commit `3d436bc`)**:
+    - Created `deploy/bine-probe.service` and `deploy/bine-probe.timer` (runs every 15 min for 8 representative tickers at $5.50).
+    - Added `bine probe` CLI subcommand in `backend/bine/cli.py` logging checks with `action="scheduled"`.
+    - Added `GET /api/recent` endpoint in `backend/bine/app.py` returning last 24h market checks.
+    - Added `"Last 24 hours (live)"` section in `frontend/src/pages/Refusals.tsx`.
+    - Added unit tests in `backend/tests/test_proxy_rate_limit_and_diagnostics.py` (59/59 pytest tests passing).
+  - **Phase 5 (Verification)**:
+    - 59/59 backend tests passing.
+    - Frontend and docs-site production builds passing with 0 errors.
+    - 0 em dashes across code, deploy kit, and README.
+    - 0 secrets in repository or git history.
+    - Shell scripts pass `bash -n` syntax checks.
+
+## 6. Important Decisions
+- **Public Demo Lock (`BINE_PUBLIC_DEMO=true`)**: Guarantees that public VPS or Vercel deployments cannot execute live swaps.
+- **Trusted Reverse Proxy IP Resolution**: Only trusts `X-Forwarded-For` from configured `trusted_proxies` (`127.0.0.1,::1`), preventing IP spoofing while isolating client rate limits.
+- **Derived Session Logic**: Market sessions are deterministically derived from UTC timestamps (US regular trading hours: 13:30–20:00 UTC Monday through Friday).
+
+## 7. Known Issues & Domain Quirks
+- **Vercel Aggregator Route Failure**: `/api/v1/dex/aggregator/quote` returns `route=None` on Vercel edge/serverless runtimes for NVDA $5.50, causing a fallback `depth_thin` refusal on the hosted site while local execution returns BUY.
+
 ## 8. Current Task
-- Completed Phases 0-7 on branch `deploy-prep` (cut from `master` at `fd9b043`) and running Phase 8 end-to-end verification before handoff (no push, no merge, no Vercel deploy).
+- Completed Phases 1, 2, 3, 4, and 5 on branch `vps-and-fixes`.
+- Ready for user handoff: no push, no merge, zero remote operations performed until user provides SSH host alias.
 
 ## 9. Next Steps
-1. User reviews `deploy-prep` branch, merges/pushes to GitHub (`kyrian-dev/Bine`), imports into Vercel with read-only `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` in `fra1`, and fills in the two `README.md` / `docs-site/index.md` TODOs (`Live demo` URL and `Demo video` link).
+1. User reviews commits on branch `vps-and-fixes` (`c448288`, `f028e6f`, `3d436bc`).
+2. User provides SSH host alias when ready to configure or deploy to the production VPS server.
 
 ## 10. Important Files
 - `memory.md` - Primary AI context and handoff state.

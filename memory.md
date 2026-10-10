@@ -222,7 +222,8 @@
     - Documented `POST /api/probe` with `cron-job.org` setup (every 30 min, POST, Bearer header) in `docs/vercel-deploy.md`, explaining Vercel Hobby's daily cron limitation.
   - **Task 3: README & Documentation (`README.md`, `docs-site/index.md`)**:
     - Added live URL `https://bine-t5tk.vercel.app` near top of `README.md` and `docs-site/index.md` with one-line description of what it does.
-    - Added clean `TODO` markers for demo video link and docs site URL without inventing either.
+    - Added verified demo video link (`https://x.com/0xearthh/status/2108855666081210686`) and reference pointing to the Developers page at `https://bine-t5tk.vercel.app/integrate` and the `docs-site/` repository folder.
+    - Verified zero TODO markers remain in either file.
     - Updated NVDA $5.50 check wording in `README.md` to match current page state.
     - Full verification: `68/68` pytest tests passing, frontend build succeeds (`479.06 kB` raw main chunk <= 480 kB), docs-site builds in 5.3s, 0 em dashes in git diff, 0 secrets.
 
@@ -239,11 +240,11 @@
 - **US Regional Geoblock (`[40304]`)**: Binance Web3 REST API rejects requests from United States IP addresses with `[40304] Service not available due to compliance restriction`. Handled explicitly via `RegionBlocked` returning HTTP 503.
 
 ## 8. Current Task
-- Tasks 1, 2, and 3 complete on local branch `vps-and-fixes`.
-- Ready to present diff and Vercel environment variables to user. Do NOT push or merge until requested.
+- Replaced demo video and docs site TODOs in `README.md` and `docs-site/index.md` on `master` with live video link and Developers route (`/integrate`).
+- Verified 0 TODO markers, 0 em dashes, 0 secrets. Committed as `b096ed8`. Not pushed.
 
 ## 9. Next Steps
-1. Present diff and Vercel environment variables to user for review and redeployment.
+- Await user instructions for pushing or redeployment.
 
 ## 10. Important Files
 - `memory.md` - Primary AI context and handoff state.

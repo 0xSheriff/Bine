@@ -7,7 +7,10 @@ Every US stock on BNB Chain can be issued by more than one provider (`Ondo Globa
 - **BUY** and the exact verified BSC token contract address to use, or
 - **REFUSE** (`DO NOT BUY`) and the exact reason in plain English.
 
-Live demo: TODO add Vercel URL after deploy.  Demo video: TODO.
+Live app: https://bine-t5tk.vercel.app (checks tokenized stocks on BNB Chain before you trade)
+
+- Demo video: TODO
+- Docs site: TODO
 
 ## Why a Pre-Trade Guard Exists
 

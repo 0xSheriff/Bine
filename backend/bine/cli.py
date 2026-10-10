@@ -24,7 +24,7 @@ from bine.app import _resolve_ticker_samples
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
 from bine.config import Settings, get_settings
 from bine.database import AsyncSessionLocal, init_db
-from bine.errors import AuthError
+from bine.errors import AuthError, RegionBlocked
 from bine.execution import build_baw_swap_command_from_quote, execute_trade_pipeline
 from bine.models import DecisionLog
 from bine.quote_engine import (
@@ -121,6 +121,10 @@ async def run_check(
                 return dict(resp.json())
         except httpx.HTTPStatusError as exc:
             detail = _extract_http_error_detail(exc.response)
+            if detail == "Binance rejected this server's region (40304)":
+                raise RegionBlocked() from exc
+            if detail and ("permission missing" in detail.lower() or "missing or rejected" in detail.lower()):
+                raise AuthError(40104 if "permission missing" in detail.lower() else 40101, detail) from exc
             raise BackendUnreachableError(base, detail) from exc
         except httpx.RequestError as exc:
             raise BackendUnreachableError(base) from exc
@@ -240,6 +244,9 @@ def _cmd_check(args: argparse.Namespace) -> int:
     except BackendUnreachableError as exc:
         print(str(exc))
         return 1
+    except RegionBlocked:
+        print("Binance rejected this server's region (40304)")
+        return 1
     except AuthError as exc:
         if exc.code in (40104, 403) or "permission" in str(exc.msg).lower():
             msg_str = str(exc.msg).strip()
@@ -265,6 +272,9 @@ def _cmd_buy(args: argparse.Namespace) -> int:
         )
     except BackendUnreachableError as exc:
         print(str(exc))
+        return 1
+    except RegionBlocked:
+        print("Binance rejected this server's region (40304)")
         return 1
     except AuthError as exc:
         if exc.code in (40104, 403) or "permission" in str(exc.msg).lower():
@@ -327,10 +337,10 @@ async def publish_probe_results_to_store(settings: Settings | None = None) -> No
 
     Failure to publish must not crash the probe.
     """
-    upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL")
-    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-    if not upstash_url or not upstash_token:
-        logger.info("Upstash Redis REST not configured; skipping remote publish.")
+    store_url = os.environ.get("UPSTASH_REDIS_REST_URL") or os.environ.get("KV_REST_API_URL")
+    store_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN") or os.environ.get("KV_REST_API_TOKEN")
+    if not store_url or not store_token:
+        logger.info("Remote store (Upstash/KV) not configured; skipping remote publish.")
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -382,9 +392,9 @@ async def publish_probe_results_to_store(settings: Settings | None = None) -> No
     try:
         async with httpx.AsyncClient(timeout=10.0) as hc:
             resp = await hc.post(
-                upstash_url.rstrip("/"),
+                store_url.rstrip("/"),
                 headers={
-                    "Authorization": f"Bearer {upstash_token}",
+                    "Authorization": f"Bearer {store_token}",
                     "Content-Type": "application/json",
                 },
                 json=["SET", "probe:recent_24h", payload_str, "EX", "86400"],
@@ -417,6 +427,8 @@ async def run_probe(
             try:
                 quote = await run_check(ticker_clean, amount_usd, settings=cfg, include_details=True)
                 break
+            except (AuthError, RegionBlocked):
+                raise
             except Exception as exc:
                 last_exc = exc
                 exc_str = str(exc).lower()
@@ -487,7 +499,7 @@ async def run_probe(
         await asyncio.sleep(1.0)
 
     # Publish recent 24h results to store if scheduled or configured
-    if scheduled or os.environ.get("UPSTASH_REDIS_REST_URL"):
+    if scheduled or os.environ.get("UPSTASH_REDIS_REST_URL") or os.environ.get("KV_REST_API_URL"):
         await publish_probe_results_to_store(cfg)
 
     return results
@@ -496,14 +508,25 @@ async def run_probe(
 def _cmd_probe(args: argparse.Namespace) -> int:
     settings = get_settings()
     tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()] if args.tickers else None
-    results = asyncio.run(
-        run_probe(
-            tickers=tickers,
-            amount_usd=args.amount_usd,
-            scheduled=args.scheduled,
-            settings=settings,
+    try:
+        results = asyncio.run(
+            run_probe(
+                tickers=tickers,
+                amount_usd=args.amount_usd,
+                scheduled=args.scheduled,
+                settings=settings,
+            )
         )
-    )
+    except RegionBlocked:
+        print("Binance rejected this server's region (40304)")
+        return 1
+    except AuthError as exc:
+        if exc.code in (40104, 403) or "permission" in str(exc.msg).lower():
+            msg_str = str(exc.msg).strip()
+            print(msg_str if msg_str.lower().startswith("binance api permission missing") else f"Binance API permission missing: {msg_str}")
+        else:
+            print("Binance API keys missing or rejected")
+        return 1
     for r in results:
         print(f"[{r['verdict']}] {r['ticker']}: {r['summary']}")
     return 0

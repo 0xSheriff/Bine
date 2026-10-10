@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from bine.client import BinanceClient
-from bine.errors import AuthError, BinanceAPIError
+from bine.errors import AuthError, BinanceAPIError, RegionBlocked
 from bine.models import TokenSample
 from bine.quality import assess_sample_row
 
@@ -713,7 +713,7 @@ async def fetch_live_issuer_quote_and_liquidity(
                 params={"binanceChainId": BSC_CHAIN_ID, "fromTokenAddress": USDT_BSC_ADDRESS, "toTokenAddress": addr, "amount": amount_wei, "userWalletAddress": user_wallet},
             )
             quote_latency_ms = round((time.monotonic() - qt0) * 1000)
-        except AuthError:
+        except (AuthError, RegionBlocked):
             raise
         except BinanceAPIError as exc:
             quote_latency_ms = round((time.monotonic() - qt0) * 1000)
@@ -726,7 +726,7 @@ async def fetch_live_issuer_quote_and_liquidity(
         nonlocal liq_resp
         try:
             liq_resp = await client.get("/api/v1/dex/market/token/top-liquidity", params={"binanceChainId": BSC_CHAIN_ID, "tokenContractAddress": addr})
-        except AuthError:
+        except (AuthError, RegionBlocked):
             raise
         except Exception:
             liq_resp = None

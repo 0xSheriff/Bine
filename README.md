@@ -7,7 +7,10 @@ Every US stock on BNB Chain can be issued by more than one provider (Ondo and bS
 - **BUY** and which token to use, or
 - **DO NOT BUY** and the exact reason in plain English.
 
-Live demo: TODO add Vercel URL after deploy.  Demo video: TODO.
+Live app: https://bine-t5tk.vercel.app (checks tokenized stocks on BNB Chain before you trade)
+
+- Demo video: TODO
+- Docs site: TODO
 
 ## Three real checks from BINE
 
@@ -16,7 +19,7 @@ $ bine check AAPL 2
 DO NOT BUY: Ondo requires at least $5 per order. Try $5.50.
 
 $ bine check NVDA 5.50
-BUY NVDAB (bStocks) - about 0.2% over the stock reference price (recorded BUY Oct 6; live results change with pool depth).
+BUY: Buy 0.0239 NVDA (NVDAB via bStocks) for $5.50. All-in $230.83 per share, 0.20% above reference. Either works (within 5 bps).
 
 $ bine check SPYon 250   # outside US market hours
 DO NOT BUY: pool is thin right now; fill is 40% to 82% above the stock price.

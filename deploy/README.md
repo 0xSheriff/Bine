@@ -1,6 +1,8 @@
-# BINE Production VPS Deployment Guide
+# Optional Self-Hosting: BINE Production VPS Deployment Guide
 
-This guide provides step-by-step instructions for deploying BINE on a dedicated Ubuntu 22.04 LTS or 24.04 LTS server.
+BINE is deployed and hosted on Vercel at `https://bine-t5tk.vercel.app`.
+
+This deploy kit is an optional guide for users who wish to self-host BINE on a dedicated Ubuntu 22.04 LTS or 24.04 LTS server.
 
 The deployment topology consists of:
 - **Caddy Web Server**: Handles automatic TLS certificates, security headers, compression (gzip/zstd), static asset delivery (SPA and VitePress docs), and reverse-proxies `/api/*` to the local backend.

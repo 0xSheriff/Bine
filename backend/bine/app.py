@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
 from bine.config import get_settings
 from bine.database import AsyncSessionLocal, init_db
-from bine.errors import AuthError
+from bine.errors import AuthError, RegionBlocked
 from bine.execution import execute_trade_pipeline
 from bine.models import DecisionLog, TokenSample
 from bine.quality import (
@@ -301,7 +301,7 @@ async def _resolve_ticker_samples(
         # If catalog succeeded and has tokens, but ticker is not in catalog -> unknown_ticker
         if catalog:
             return []
-    except AuthError:
+    except (AuthError, RegionBlocked):
         raise
     except Exception as exc:
         logger.debug("Live /rwa/tokens fetch fell back to DB (%s: %s)", type(exc).__name__, exc)
@@ -525,6 +525,11 @@ async def quote_stock(
                 )
             else:
                 evaluations = []
+    except RegionBlocked as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Binance rejected this server's region (40304)",
+        ) from exc
     except AuthError as exc:
         raise HTTPException(
             status_code=503,
@@ -627,6 +632,11 @@ async def execute_stock_trade(
                     admin_token=supplied_token,
                     require_admin_token=req.execute_live and not demo_locked,
                 )
+    except RegionBlocked as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Binance rejected this server's region (40304)",
+        ) from exc
     except AuthError as exc:
         raise HTTPException(
             status_code=503,
@@ -687,6 +697,18 @@ async def list_decisions(
     return {"count": len(items), "decisions": items}
 
 
+def _get_store_config() -> tuple[str, str] | None:
+    """Return (store_url, store_token) accepting UPSTASH_REDIS_REST_* or KV_REST_API_*."""
+    url = os.environ.get("UPSTASH_REDIS_REST_URL") or os.environ.get("KV_REST_API_URL")
+    token = os.environ.get("UPSTASH_REDIS_REST_TOKEN") or os.environ.get("KV_REST_API_TOKEN")
+    if url and token:
+        return url.rstrip("/"), token
+    return None
+
+
+ROTATING_PROBE_TICKERS = ["NVDA", "SPY", "AAPL", "KLAC", "NFLX", "PPLT", "CVNA", "NOW"]
+
+
 _RECENT_CACHE: tuple[float, dict[str, Any]] | None = None
 _RECENT_CACHE_TTL_SEC = 60.0
 
@@ -701,10 +723,9 @@ async def recent_checks(
     global _RECENT_CACHE
     _check_rate_limit(request, "recent", QUOTE_RATE_LIMIT_PER_MIN)
 
-    upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL")
-    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-
-    if upstash_url and upstash_token:
+    store_cfg = _get_store_config()
+    if store_cfg is not None:
+        store_url, store_token = store_cfg
         now_mono = _time.monotonic()
         if _RECENT_CACHE is not None and (now_mono - _RECENT_CACHE[0]) < _RECENT_CACHE_TTL_SEC:
             return _RECENT_CACHE[1]
@@ -712,8 +733,8 @@ async def recent_checks(
         try:
             async with httpx.AsyncClient(timeout=5.0) as hc:
                 resp = await hc.get(
-                    f"{upstash_url.rstrip('/')}/get/probe:recent_24h",
-                    headers={"Authorization": f"Bearer {upstash_token}"},
+                    f"{store_url}/get/probe:recent_24h",
+                    headers={"Authorization": f"Bearer {store_token}"},
                 )
                 if resp.status_code == 200:
                     body = resp.json()
@@ -727,7 +748,7 @@ async def recent_checks(
                             _RECENT_CACHE = (now_mono, doc)
                             return doc
         except Exception as exc:
-            logger.warning("Upstash REST read failed for /api/recent: %s", exc)
+            logger.warning("Remote store REST read failed for /api/recent: %s", exc)
 
         return {
             "count": 0,
@@ -783,6 +804,227 @@ async def recent_checks(
         "hours": hours,
         "checks": checks,
         "message": "" if checks else "No background probes recorded in the last 24 hours.",
+    }
+
+
+@app.post("/api/probe")
+async def probe_endpoint(
+    request: Request,
+    tickers: str | None = Query(None, description="Optional comma-separated ticker override (max 4)"),
+) -> dict[str, Any]:
+    """Scheduled background probe endpoint for hosted environments (e.g. invoked via cron-job.org).
+
+    Requires Authorization: Bearer $BINE_PROBE_SECRET (constant-time compared).
+    Disabled with 404 if BINE_PROBE_SECRET is unset.
+    Probes at most 4 tickers from the rotating list, 1.0s apart, with 429 retry,
+    merges into one JSON document in the remote store (dropping >24h entries, EX 86400),
+    and aborts immediately with HTTP 503 on AuthError or RegionBlocked without recording anything.
+    """
+    probe_secret = os.environ.get("BINE_PROBE_SECRET", "").strip()
+    if not probe_secret:
+        raise HTTPException(
+            status_code=404,
+            detail="Probe endpoint disabled (BINE_PROBE_SECRET is not configured)",
+        )
+
+    auth_header = request.headers.get("Authorization") or ""
+    parts = auth_header.strip().split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer" or not hmac.compare_digest(parts[1].strip(), probe_secret):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    store_cfg = _get_store_config()
+    existing_doc: dict[str, Any] = {}
+    if store_cfg is not None:
+        store_url, store_token = store_cfg
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as hc:
+                resp = await hc.get(
+                    f"{store_url}/get/probe:recent_24h",
+                    headers={"Authorization": f"Bearer {store_token}"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    res_val = data.get("result")
+                    if isinstance(res_val, str) and res_val:
+                        existing_doc = json.loads(res_val)
+        except Exception as exc:
+            logger.warning("Failed to fetch existing probe:recent_24h from store: %s", exc)
+
+    if tickers:
+        chosen_tickers = [t.strip().upper() for t in tickers.split(",") if t.strip()][:4]
+        next_cursor = existing_doc.get("next_ticker_index", 0) if isinstance(existing_doc, dict) else 0
+    else:
+        cursor = existing_doc.get("next_ticker_index", 0) if isinstance(existing_doc, dict) else 0
+        if not isinstance(cursor, int):
+            cursor = 0
+        cursor = cursor % len(ROTATING_PROBE_TICKERS)
+        chosen_tickers = [
+            ROTATING_PROBE_TICKERS[(cursor + i) % len(ROTATING_PROBE_TICKERS)]
+            for i in range(min(4, len(ROTATING_PROBE_TICKERS)))
+        ]
+        next_cursor = (cursor + len(chosen_tickers)) % len(ROTATING_PROBE_TICKERS)
+
+    settings = get_settings()
+    maybe_enable_dev_dns_fallback(settings.dev_dns_fallback)
+    wallet = settings.bine_wallet_address or DEFAULT_QUOTE_WALLET
+    amount_usd = 5.50
+
+    new_checks: list[dict[str, Any]] = []
+
+    try:
+        async with BinanceClient(
+            api_key=settings.binance_api_key,
+            secret_key=settings.binance_secret_key,
+        ) as client:
+            for idx, ticker in enumerate(chosen_tickers):
+                if idx > 0:
+                    await asyncio.sleep(1.0)
+
+                quote_res: dict[str, Any] | None = None
+                for attempt in range(1, 3):
+                    try:
+                        rows = await _resolve_ticker_samples(client, ticker)
+                        evaluations: list[Any] = []
+                        if rows:
+                            evaluations = list(
+                                await asyncio.gather(
+                                    *(
+                                        fetch_live_issuer_quote_and_liquidity(
+                                            client=client,
+                                            sample=row,
+                                            amount_usd=amount_usd,
+                                            wallet_address=wallet,
+                                        )
+                                        for row in rows
+                                    )
+                                )
+                            )
+                        verdict_resp = build_verdict(
+                            ticker=ticker,
+                            amount_usd=amount_usd,
+                            evaluations=evaluations,
+                            max_live_trade_usd=settings.bine_max_trade_usd,
+                            live_mode=False,
+                        )
+                        quote_res = verdict_resp.to_dict(include_details=True)
+                        break
+                    except (AuthError, RegionBlocked):
+                        raise
+                    except Exception as exc:
+                        exc_str = str(exc).lower()
+                        is_429 = "429" in exc_str or "rate limit" in exc_str or getattr(exc, "code", None) == 42900 or getattr(exc, "status_code", None) == 429
+                        if is_429 and attempt == 1:
+                            logger.warning("Probe rate limited on %s (attempt 1/2); waiting 3s before retry...", ticker)
+                            await asyncio.sleep(3.0)
+                            continue
+                        logger.warning("Probe failed for ticker %s on attempt %d: %s", ticker, attempt, exc)
+                        break
+
+                if quote_res is not None:
+                    verdict = quote_res.get("verdict", "UNKNOWN")
+                    refusal = quote_res.get("refusal") or {}
+                    rec = quote_res.get("recommended") or {}
+                    now_utc = datetime.now(timezone.utc).isoformat()
+                    check_item = {
+                        "id": None,
+                        "created_at": now_utc,
+                        "ticker": ticker,
+                        "amount_usd": amount_usd,
+                        "action": "scheduled",
+                        "verdict": verdict,
+                        "recommended_platform": rec.get("platform"),
+                        "recommended_symbol": rec.get("symbol"),
+                        "recommended_contract_address": rec.get("contract_address") or rec.get("address"),
+                        "refusal_code": refusal.get("code"),
+                        "reason": refusal.get("reason"),
+                        "expected_shares": rec.get("expected_shares"),
+                        "all_in_price_per_share_usd": rec.get("all_in_price_per_share_usd"),
+                        "all_in_vs_reference_pct": rec.get("spread_vs_reference_pct") or rec.get("all_in_vs_reference_pct"),
+                        "effective_slippage_pct": rec.get("effective_slippage_pct"),
+                        "tx_hash": None,
+                    }
+                    try:
+                        async with AsyncSessionLocal() as session:
+                            dlog = DecisionLog(
+                                ticker=ticker,
+                                amount_usd=amount_usd,
+                                action="scheduled",
+                                verdict=verdict,
+                                recommended_platform=check_item["recommended_platform"],
+                                recommended_symbol=check_item["recommended_symbol"],
+                                recommended_contract_address=check_item["recommended_contract_address"],
+                                refusal_code=check_item["refusal_code"],
+                                reason=check_item["reason"],
+                                expected_shares=check_item["expected_shares"],
+                                all_in_price_per_share_usd=check_item["all_in_price_per_share_usd"],
+                                all_in_vs_reference_pct=check_item["all_in_vs_reference_pct"],
+                                effective_slippage_pct=check_item["effective_slippage_pct"],
+                                live_mode=False,
+                                execution_status=None,
+                            )
+                            session.add(dlog)
+                            await session.commit()
+                            await session.refresh(dlog)
+                            check_item["id"] = dlog.id
+                    except Exception as exc:
+                        logger.debug("Local DecisionLog record skipped in probe: %s", exc)
+
+                    new_checks.append(check_item)
+
+    except RegionBlocked as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Binance rejected this server's region (40304)",
+        ) from exc
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=_auth_error_detail(exc),
+        ) from exc
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff_iso = cutoff.isoformat()
+
+    old_checks = existing_doc.get("checks", []) if isinstance(existing_doc, dict) else []
+    valid_old_checks = [
+        c for c in old_checks
+        if isinstance(c, dict) and (c.get("created_at") or "") >= cutoff_iso
+    ]
+
+    all_checks = (new_checks + valid_old_checks)[:200]
+
+    updated_doc = {
+        "count": len(all_checks),
+        "hours": 24,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "next_ticker_index": next_cursor,
+        "checks": all_checks,
+    }
+
+    if store_cfg is not None:
+        store_url, store_token = store_cfg
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as hc:
+                await hc.post(
+                    store_url,
+                    headers={
+                        "Authorization": f"Bearer {store_token}",
+                        "Content-Type": "application/json",
+                    },
+                    json=["SET", "probe:recent_24h", json.dumps(updated_doc), "EX", "86400"],
+                )
+        except Exception as exc:
+            logger.warning("Failed to save updated probe document to store: %s", exc)
+
+    global _RECENT_CACHE
+    _RECENT_CACHE = None
+
+    return {
+        "status": "ok",
+        "probed_count": len(new_checks),
+        "tickers": [c["ticker"] for c in new_checks],
+        "total_recent_24h": len(all_checks),
+        "checks": new_checks,
     }
 
 

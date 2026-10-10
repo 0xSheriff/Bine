@@ -54,6 +54,20 @@ class MarketHoursError(BinanceAPIError):
     pass
 
 
+class RegionBlocked(BinanceAPIError):
+    """40304: Service not available due to compliance restriction."""
+
+    def __init__(
+        self,
+        code: int = 40304,
+        msg: str = "Binance rejected this server's region (40304)",
+        *,
+        status_code: int = 200,
+    ):
+        msg = "Binance rejected this server's region (40304)"
+        super().__init__(code, msg, status_code=status_code)
+
+
 # Map API error codes to exception classes
 _CODE_MAP: dict[int, type[BinanceAPIError]] = {
     40101: AuthError,
@@ -61,6 +75,7 @@ _CODE_MAP: dict[int, type[BinanceAPIError]] = {
     40103: TimestampError,
     40104: AuthError,
     403: AuthError,
+    40304: RegionBlocked,
     42900: RateLimitError,
     40411: ChainNotSupportedError,
     40367: MarketHoursError,

@@ -205,34 +205,45 @@
 - **Permission Errors Routed to HTTP 503**: Binance `40104` / HTTP `403` permission errors raise `AuthError` and return HTTP 503 naming the missing permission instead of falling through to a `depth_thin` refusal.
 
 ## 7. Known Issues & Domain Quirks
-- **2026-10-10 (Background Probe Feed, Remote Store Publisher, & VPS Deploy on `vps-and-fixes`)**:
-  - **Standing Rules Update (`SKILL.md`)**: Expanded `.agents/skills/bine-ui-standing-rules/SKILL.md` to 7 standing rules, adding Rule 6 (Distinguish issuer minimums from safety caps) and Rule 7 (Real captured states & provenance binding for media/demos).
-  - **Probe Publisher (`backend/bine/cli.py`)**: Added sequential quote delay (1.0s), automatic 3.0s backoff and retry on HTTP 429, and `publish_probe_results_to_store()` writing the last 24h of probes as a single JSON document to Upstash Redis REST (`EX 86400` TTL). Failure to publish logs a warning without crashing the probe.
-  - **Store Read Path (`backend/bine/app.py`)**: Updated `GET /api/recent` to read from the remote store with a 60s in-memory cache, returning an honest empty state (`"No background probes recorded in the last 24 hours."`) if unconfigured, empty, or unreachable.
-  - **Copy Truthfulness (`frontend/src/pages/Refusals.tsx`)**: Aligned empty state to `"No background probes recorded in the last 24 hours."`, removed any mention of VPS or timer host, and gated `"last probe: N minutes ago"` to render only when verified data exists.
-  - **VPS Installation (`~/apps/bine`)**: Cloned and synced under user `sheriff` (not root), created `uv` virtualenv, passed all 62 tests (`62 passed in 3.85s`), provisioned `/etc/bine/bine.env` (file mode 0600, owned by `sheriff:sheriff`), and installed/enabled `bine-probe.service` and `bine-probe.timer` running every 30 minutes via systemd. Sentinel's pm2 app was completely untouched.
-  - **Geoblock Finding**: Verified that the VPS host IP (located in the United States) is geoblocked by Binance Web3 API with business error `[40304] Service not available due to compliance restriction`. Because of this regional restriction, probes executed on the US VPS return compliance refusals rather than live quotes.
+- **2026-10-10 (RegionBlocked 40304 Classification, Hosted Probe Endpoint, & Docs Sync on `vps-and-fixes`)**:
+  - **Task 1: Error Classification (`errors.py`, `quote_engine.py`, `app.py`, `cli.py`)**:
+    - Created `RegionBlocked(BinanceAPIError)` mapped from Binance error code `40304` ("Service not available due to compliance restriction").
+    - `/api/quote` and `/api/execute` catch `RegionBlocked` and return HTTP 503 with `"Binance rejected this server's region (40304)"` instead of falling through to a false `depth_thin` refusal.
+    - CLI (`_cmd_check`, `_cmd_buy`, `_cmd_probe`) catches `RegionBlocked` and prints `"Binance rejected this server's region (40304)"` with exit code 1.
+    - `run_probe` and `POST /api/probe` re-raise `(AuthError, RegionBlocked)` immediately, recording zero rows to `DecisionLog` and zero records to the remote store.
+    - Added unit tests in `backend/tests/test_region_and_probe.py` covering 40304, 40104, normal refusal, and CLI/probe abort behavior (`68/68` tests passing).
+  - **Task 2: Hosted Probe Endpoint & Store Bridge (`app.py`, `docs/vercel-deploy.md`, `deploy/`)**:
+    - Added `POST /api/probe` requiring `Authorization: Bearer $BINE_PROBE_SECRET` (constant-time `hmac.compare_digest`, 401 if invalid, 404 if unset).
+    - Probes at most 4 tickers from the rotating list (`NVDA`, `SPY`, `AAPL`, `KLAC`, `NFLX`, `PPLT`, `CVNA`, `NOW`), 1.0s apart, with 3s backoff on 429.
+    - Store client helper `_get_store_config()` accepts either `UPSTASH_REDIS_REST_URL`/`TOKEN` or `KV_REST_API_URL`/`TOKEN`.
+    - Merges results into one 24h JSON document (`probe:recent_24h`, `EX 86400`), dropping entries older than 24h.
+    - `/api/recent` reads from remote store with 60s in-memory cache and falls back to truthful empty state.
+    - Removed VPS probe path: stopped, disabled, and removed `bine-probe.service` & `bine-probe.timer` on VPS (`ssh build`, leaving `pm2 afterhours-sentinel` untouched); deleted local `deploy/bine-probe.*` files; and labeled `deploy/README.md` as an optional self-hosting guide.
+    - Documented `POST /api/probe` with `cron-job.org` setup (every 30 min, POST, Bearer header) in `docs/vercel-deploy.md`, explaining Vercel Hobby's daily cron limitation.
+  - **Task 3: README & Documentation (`README.md`, `docs-site/index.md`)**:
+    - Added live URL `https://bine-t5tk.vercel.app` near top of `README.md` and `docs-site/index.md` with one-line description of what it does.
+    - Added clean `TODO` markers for demo video link and docs site URL without inventing either.
+    - Updated NVDA $5.50 check wording in `README.md` to match current page state.
+    - Full verification: `68/68` pytest tests passing, frontend build succeeds (`479.06 kB` raw main chunk <= 480 kB), docs-site builds in 5.3s, 0 em dashes in git diff, 0 secrets.
 
 ## 6. Important Decisions
 - **Public Demo Lock (`BINE_PUBLIC_DEMO=true`)**: Guarantees that public VPS or Vercel deployments cannot execute live swaps.
 - **Trusted Reverse Proxy IP Resolution**: Only trusts `X-Forwarded-For` from configured `trusted_proxies` (`127.0.0.1,::1`), preventing IP spoofing while isolating client rate limits.
 - **Derived Session Logic**: Market sessions are deterministically derived from UTC timestamps (US regular trading hours: 13:30–20:00 UTC Monday through Friday).
-- **Permission Errors Routed to HTTP 503**: Binance `40104` / HTTP `403` permission errors raise `AuthError` and return HTTP 503 naming the missing permission instead of falling through to a `depth_thin` refusal.
+- **Permission & Region Errors Routed to HTTP 503**: Binance `40104` / HTTP `403` permission errors and `40304` regional compliance restrictions return HTTP 503 naming the specific error instead of falling through to a `depth_thin` refusal.
+- **Hosted Probe via External Cron**: Background probes run on the hosted Vercel app via `POST /api/probe` triggered by `cron-job.org` every 30 minutes, keeping BINE entirely on Vercel without a VPS.
 - **Honest Probe Empty State**: When the remote store is unconfigured, unreachable, or empty, `/api/recent` and the UI return an empty list with `"No background probes recorded in the last 24 hours."` without fabricating entries or mentioning server infrastructure.
 
 ## 7. Known Issues & Domain Quirks
 - **Vercel Aggregator Route Failure**: `/api/v1/dex/aggregator/quote` returns `route=None` on Vercel edge/serverless runtimes for NVDA $5.50, causing a fallback `depth_thin` refusal on the hosted site while local execution returns BUY.
-- **US VPS Regional Geoblock (`[40304]`)**: Binance Web3 REST API rejects requests from United States IP addresses with `[40304] Service not available due to compliance restriction`. Background probes running directly from a US VPS cannot fetch live Binance quotes without an egress proxy in a supported region.
+- **US Regional Geoblock (`[40304]`)**: Binance Web3 REST API rejects requests from United States IP addresses with `[40304] Service not available due to compliance restriction`. Handled explicitly via `RegionBlocked` returning HTTP 503.
 
 ## 8. Current Task
-- Completed Phase 1: Installed BINE under `~/apps/bine` on VPS as user `sheriff`, `uv` venv with 62/62 tests passing, `/etc/bine/bine.env` mode 0600.
-- Configured and activated `bine-probe.timer` running every 30 minutes.
-- Implemented probe publisher with 429 retry and Upstash Redis REST 24h document export.
-- Updated `/api/recent` read path with 60s cache and truthful empty state fallback.
-- Updated Refusals empty-state copy to `"No background probes recorded in the last 24 hours."` with zero em dashes and zero raw underscores.
+- Tasks 1, 2, and 3 complete on local branch `vps-and-fixes`.
+- Ready to present diff and Vercel environment variables to user. Do NOT push or merge until requested.
 
 ## 9. Next Steps
-1. Report Phase 1 completion, `systemctl list-timers`, journald output, and regional geoblock finding to the user.
+1. Present diff and Vercel environment variables to user for review and redeployment.
 
 ## 10. Important Files
 - `memory.md` - Primary AI context and handoff state.

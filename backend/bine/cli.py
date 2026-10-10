@@ -237,8 +237,12 @@ def _cmd_check(args: argparse.Namespace) -> int:
     except BackendUnreachableError as exc:
         print(str(exc))
         return 1
-    except AuthError:
-        print("Binance API keys missing or rejected")
+    except AuthError as exc:
+        if exc.code in (40104, 403) or "permission" in str(exc.msg).lower():
+            msg_str = str(exc.msg).strip()
+            print(msg_str if msg_str.lower().startswith("binance api permission missing") else f"Binance API permission missing: {msg_str}")
+        else:
+            print("Binance API keys missing or rejected")
         return 1
     if args.json:
         print(json.dumps(result, indent=2))
@@ -259,8 +263,12 @@ def _cmd_buy(args: argparse.Namespace) -> int:
     except BackendUnreachableError as exc:
         print(str(exc))
         return 1
-    except AuthError:
-        print("Binance API keys missing or rejected")
+    except AuthError as exc:
+        if exc.code in (40104, 403) or "permission" in str(exc.msg).lower():
+            msg_str = str(exc.msg).strip()
+            print(msg_str if msg_str.lower().startswith("binance api permission missing") else f"Binance API permission missing: {msg_str}")
+        else:
+            print("Binance API keys missing or rejected")
         return 1
     quote = dry_result.get("quote") or {}
     print(format_plain_check_line(quote))

@@ -18,9 +18,11 @@ class BinanceAPIError(Exception):
 
 
 class AuthError(BinanceAPIError):
-    """40101 / HTTP 302 / HTTP 401 / non-JSON: Binance API keys missing or rejected."""
+    """40101 / 40104 / HTTP 302 / HTTP 401 / HTTP 403 / non-JSON: Binance API keys missing, rejected, or permission missing."""
 
     def __init__(self, code: int = 40101, msg: str = "Binance API keys missing or rejected", *, status_code: int = 401):
+        if (code in (40104, 403) or status_code == 403) and msg == "Binance API keys missing or rejected":
+            msg = "Binance API permission missing"
         super().__init__(code, msg, status_code=status_code)
 
 
@@ -57,6 +59,8 @@ _CODE_MAP: dict[int, type[BinanceAPIError]] = {
     40101: AuthError,
     40102: SignatureError,
     40103: TimestampError,
+    40104: AuthError,
+    403: AuthError,
     42900: RateLimitError,
     40411: ChainNotSupportedError,
     40367: MarketHoursError,

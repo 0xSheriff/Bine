@@ -285,8 +285,9 @@ class BinanceClient:
                     )
 
                 if resp.status_code in (401, 403):
-                    err_code = int(data.get("code") or 40101)
-                    err_msg = str(data.get("msg") or "Binance API keys missing or rejected")
+                    err_code = int(data.get("code") or (40104 if resp.status_code == 403 else 40101))
+                    raw_msg = data.get("msg") or data.get("message")
+                    err_msg = str(raw_msg or ("Binance API permission missing" if resp.status_code == 403 else "Binance API keys missing or rejected"))
                     logger.warning(
                         "Binance API auth error: HTTP %d, code=%s, msg=%s",
                         resp.status_code,
@@ -300,7 +301,7 @@ class BinanceClient:
                     )
 
                 code = data.get("code", -1)
-                msg = data.get("msg", "unknown error")
+                msg = data.get("msg") or data.get("message") or "unknown error"
 
                 # Business-level rate limit (code 42900 inside HTTP 200)
                 if code == 42900:

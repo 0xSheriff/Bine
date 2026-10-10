@@ -175,22 +175,27 @@
     - 0 em dashes across code, deploy kit, and README.
     - 0 secrets in repository or git history.
     - Shell scripts pass `bash -n` syntax checks.
+  - **Permission Error Mapping (commit on `vps-and-fixes`)**:
+    - Mapped Binance error code `40104` and HTTP `403` to `AuthError` in `backend/bine/errors.py` and `backend/bine/client.py`.
+    - Updated `_call_quote()` and `_call_liquidity()` in `backend/bine/quote_engine.py` to re-raise `AuthError` rather than catching it into `quote_err` (which previously produced a false `depth_thin` refusal).
+    - Updated `app.py` (`quote_stock` and `execute_stock_trade`) and `cli.py` to format missing permission error details on HTTP 503.
+    - Added `test_permission_error_40104_from_quote_and_rwa_returns_503_naming_permission` in `backend/tests/test_quote_engine.py` (60/60 pytest tests passing).
 
 ## 6. Important Decisions
 - **Public Demo Lock (`BINE_PUBLIC_DEMO=true`)**: Guarantees that public VPS or Vercel deployments cannot execute live swaps.
 - **Trusted Reverse Proxy IP Resolution**: Only trusts `X-Forwarded-For` from configured `trusted_proxies` (`127.0.0.1,::1`), preventing IP spoofing while isolating client rate limits.
 - **Derived Session Logic**: Market sessions are deterministically derived from UTC timestamps (US regular trading hours: 13:30–20:00 UTC Monday through Friday).
+- **Permission Errors Routed to HTTP 503**: Binance `40104` / HTTP `403` permission errors raise `AuthError` and return HTTP 503 naming the missing permission instead of falling through to a `depth_thin` refusal.
 
 ## 7. Known Issues & Domain Quirks
 - **Vercel Aggregator Route Failure**: `/api/v1/dex/aggregator/quote` returns `route=None` on Vercel edge/serverless runtimes for NVDA $5.50, causing a fallback `depth_thin` refusal on the hosted site while local execution returns BUY.
 
 ## 8. Current Task
-- Completed Phases 1, 2, 3, 4, and 5 on branch `vps-and-fixes`.
-- Ready for user handoff: no push, no merge, zero remote operations performed until user provides SSH host alias.
+- Completed mapping of Binance error code 40104 and HTTP 403 permission errors to AuthError returning 503 with named missing permission.
+- 60/60 pytest tests passing.
 
 ## 9. Next Steps
-1. User reviews commits on branch `vps-and-fixes` (`c448288`, `f028e6f`, `3d436bc`).
-2. User provides SSH host alias when ready to configure or deploy to the production VPS server.
+1. User reviews commit on branch `vps-and-fixes`.
 
 ## 10. Important Files
 - `memory.md` - Primary AI context and handoff state.

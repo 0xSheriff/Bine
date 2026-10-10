@@ -817,6 +817,76 @@ def test_missing_or_rejected_api_keys_returns_503_and_cli_single_line(
         assert out_lines == ["Binance API keys missing or rejected"]
 
 
+def test_permission_error_40104_from_quote_and_rwa_returns_503_naming_permission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Binance error 40104 and HTTP 403 permission errors from quote and RWA calls map to AuthError and return 503 naming the permission."""
+    import asyncio
+    import httpx as _httpx
+    from httpx import ASGITransport, AsyncClient
+
+    from bine.app import _QUOTE_CACHE, app, reset_rate_limits
+    from bine.client import BASE_URL, BinanceClient
+    from bine.errors import AuthError
+    from bine.quote_engine import clear_rwa_catalog_cache
+
+    clear_rwa_catalog_cache()
+    _QUOTE_CACHE.clear()
+    reset_rate_limits()
+
+    ondo_payload = json.loads((FIXTURES / "rwa_tokens_ondo_bsc.json").read_text())
+    bstock_payload = json.loads((FIXTURES / "rwa_tokens_bstock_bsc.json").read_text())
+
+    def _rwa_router(request):
+        pid = request.url.params.get("platformId", "")
+        return _httpx.Response(200, json=ondo_payload if pid == "ondo" else bstock_payload)
+
+    with respx.mock(assert_all_called=False) as respx_mock:
+        # Case 1: Quote call returns 40104 permission error
+        respx_mock.get(f"{BASE_URL}/api/v1/dex/market/rwa/tokens").mock(side_effect=_rwa_router)
+        respx_mock.get(f"{BASE_URL}/api/v1/dex/aggregator/quote").mock(
+            return_value=_httpx.Response(200, json={"code": 40104, "msg": "API key lacks trade permission", "data": None})
+        )
+        respx_mock.get(f"{BASE_URL}/api/v1/dex/market/token/top-liquidity").mock(
+            return_value=_httpx.Response(200, json={"code": 0, "msg": "success", "data": {"totalLiquidity": "1000000"}})
+        )
+
+        async def _run_tests() -> None:
+            # Direct client raises AuthError
+            async with BinanceClient(api_key="k", secret_key="s") as bc:
+                with pytest.raises(AuthError) as exc_info:
+                    await bc.get("/api/v1/dex/aggregator/quote")
+                assert exc_info.value.code == 40104
+                assert "trade permission" in exc_info.value.msg
+
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                # 1. API returns 503 instead of depth_thin refusal
+                r = await ac.get("/api/quote?ticker=NVDA&amount_usd=5.50")
+                assert r.status_code == 503
+                data = r.json()
+                assert "verdict" not in data
+                assert "Binance API permission missing: API key lacks trade permission" in data["detail"]
+
+                # Case 2: RWA call returns HTTP 403 / 40104 permission error
+                clear_rwa_catalog_cache()
+                _QUOTE_CACHE.clear()
+                respx_mock.get(f"{BASE_URL}/api/v1/dex/market/rwa/tokens").mock(
+                    return_value=_httpx.Response(
+                        403,
+                        json={"code": 40104, "msg": "Permission denied for RWA catalog", "data": None},
+                    )
+                )
+
+                r2 = await ac.get("/api/quote?ticker=NVDA&amount_usd=5.50")
+                assert r2.status_code == 503
+                data2 = r2.json()
+                assert "verdict" not in data2
+                assert "Binance API permission missing: Permission denied for RWA catalog" in data2["detail"]
+
+        asyncio.run(_run_tests())
+
+
 @pytest.mark.asyncio
 async def test_quote_15s_cache_preserves_quoted_at_and_20_per_min_rate_limit(
     nvda_ondo_quote_fixture: dict,

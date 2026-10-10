@@ -457,6 +457,15 @@ _QUOTE_CACHE: dict[tuple[str, float, bool, int], tuple[float, dict[str, Any]]] =
 _QUOTE_CACHE_TTL_SEC = 15.0
 
 
+def _auth_error_detail(exc: AuthError) -> str:
+    if exc.code in (40104, 403) or "permission" in str(exc.msg).lower():
+        msg_str = str(exc.msg).strip()
+        if msg_str.lower().startswith("binance api permission missing"):
+            return msg_str
+        return f"Binance API permission missing: {msg_str}"
+    return exc.msg or "Binance API keys missing or rejected"
+
+
 @app.get(
     "/api/quote",
     response_model=QuoteResponseModel,
@@ -517,7 +526,7 @@ async def quote_stock(
     except AuthError as exc:
         raise HTTPException(
             status_code=503,
-            detail="Binance API keys missing or rejected",
+            detail=_auth_error_detail(exc),
         ) from exc
 
     verdict_resp = build_verdict(
@@ -574,47 +583,53 @@ async def execute_stock_trade(
     ticker_upper = req.ticker.strip().upper()
     wallet = settings.bine_wallet_address or DEFAULT_QUOTE_WALLET
 
-    async with BinanceClient(
-        api_key=settings.binance_api_key,
-        secret_key=settings.binance_secret_key,
-    ) as client:
-        rows = await _resolve_ticker_samples(client, ticker_upper)
-        if rows:
-            evaluations = list(
-                await asyncio.gather(
-                    *(
-                        fetch_live_issuer_quote_and_liquidity(
-                            client=client,
-                            sample=row,
-                            amount_usd=req.amount_usd,
-                            wallet_address=wallet,
+    try:
+        async with BinanceClient(
+            api_key=settings.binance_api_key,
+            secret_key=settings.binance_secret_key,
+        ) as client:
+            rows = await _resolve_ticker_samples(client, ticker_upper)
+            if rows:
+                evaluations = list(
+                    await asyncio.gather(
+                        *(
+                            fetch_live_issuer_quote_and_liquidity(
+                                client=client,
+                                sample=row,
+                                amount_usd=req.amount_usd,
+                                wallet_address=wallet,
+                            )
+                            for row in rows
                         )
-                        for row in rows
                     )
                 )
-            )
-        else:
-            evaluations = []
+            else:
+                evaluations = []
 
-        verdict_resp = build_verdict(
-            ticker=ticker_upper,
-            amount_usd=req.amount_usd,
-            evaluations=evaluations,
-            max_live_trade_usd=settings.bine_max_trade_usd,
-            live_mode=effective_live,
-        )
-
-        async with AsyncSessionLocal() as session:
-            return await execute_trade_pipeline(
-                session=session,
-                client=client,
-                verdict_resp=verdict_resp,
+            verdict_resp = build_verdict(
+                ticker=ticker_upper,
+                amount_usd=req.amount_usd,
                 evaluations=evaluations,
-                settings=settings,
-                execute_live=req.execute_live,
-                admin_token=supplied_token,
-                require_admin_token=req.execute_live and not demo_locked,
+                max_live_trade_usd=settings.bine_max_trade_usd,
+                live_mode=effective_live,
             )
+
+            async with AsyncSessionLocal() as session:
+                return await execute_trade_pipeline(
+                    session=session,
+                    client=client,
+                    verdict_resp=verdict_resp,
+                    evaluations=evaluations,
+                    settings=settings,
+                    execute_live=req.execute_live,
+                    admin_token=supplied_token,
+                    require_admin_token=req.execute_live and not demo_locked,
+                )
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=_auth_error_detail(exc),
+        ) from exc
 
 
 @app.get("/api/decisions")

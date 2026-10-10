@@ -51,6 +51,23 @@
       - `PHASE D` (`7b967ce`): Captured and inspected all 30 `docs/screenshots/glass_<page>_<theme>_<width>.png` screenshots, verified performance traces (`0` long tasks `> 50 ms`) and WCAG 2.2 AA contrast (`> 14:1`), updated `memory.md`, and codified the 4 standing frontend rules in `.agents/skills/bine-ui-standing-rules/SKILL.md`.
       - `PHASE E` (`2c3ce6e`): Removed all default-open panel states across `Guard.tsx`, `Refusals.tsx`, `Receipts.tsx`, and `Integrate.tsx`; updated `scripts/verify_glass_and_perf.py` to verify `initial_panel_open: false`, click `.bine-glass-trigger` to open panels (`glass_panel_opened: true`), decode PNG screenshots to compute sRGB WCAG contrast ratios, and re-capture all 30 `docs/screenshots/glass_*.png` files; aligned `GUARD_RULE_DEFINITIONS` (`0.25x-5.00x`, `$5.00 Ondo / $0.01 bStocks`) and `recorded-refusals.json` provenance with `docs/raw/regular_hours_quotes_2026-10-05.jsonl` and `docs/devex-report-facts.md`; extended `scripts/check_underscores.py` (`TOTAL_UNDERSCORE_OFFENDERS=0`); lazy-loaded `HeroArt` so main JS chunk is `477.58 kB` raw (`<= 480 kB`); and added the two anti-rigging rules to `memory.md` and `.agents/skills/bine-ui-standing-rules/SKILL.md`.
       - `PHASE F`: Created `scripts/verify_rules_truth_table.py` extracting all 8 backend refusal codes and threshold constants (`backend/bine/quote_engine.py`, `backend/bine/quality.py`) and verifying `8/8` `MATCH` rows (`MISMATCH_ROWS=0`) against `GUARD_RULE_DEFINITIONS` and the rendered DOM on `/refusals` and `/guard`; derived all rule and refusal counts from data (`GUARD_RULES_COUNT`, `recordedRefusals.length = 7`, `0` hard-coded count strings); mounted `<BineGlassFilterDef />` only while a glass panel is open (`GlassStack.tsx`), gated offscreen `BineLogoTile` WebGL shader initialization via `inView || reducedMotion`, and reserved `aspect-[900/680]` on mobile `<HeroArt />` so 3-run median Fair Lighthouse (`vite preview` on `:4173` for `7fd9564` vs `:4174` for `HEAD`) achieved exact parity on `/` (`75` vs `75`, CLS improved from `0.0948` to `0.0400`) and `+1` point on `/guard?ticker=NVDA&amount=5.5` (`82` vs `81`, TBT `536 ms` vs `546 ms`); tinted outer `.bine-glass-panel` at `0.50` and inner contrast plate `.bine-glass-scrim` at `0.82` (`<= 0.85`), verifying `>= 5.84:1` (plate alone) and `>= 6.89:1` (plate in glass) WCAG contrast and capturing before/after `1440px` screenshots; extended `scripts/check_underscores.py` so `guard_refuse` and `guard_below_min` open a glass panel (`glass_open=True`, `TOTAL_UNDERSCORE_OFFENDERS=0`); verified `0px` logo `x` drift and `0.0000/255` pixel diff (`scripts/verify_logo_and_alignment.py`); and added `"Derive counts from data, never hard-code them"` to `.agents/skills/bine-ui-standing-rules/SKILL.md`.
+    - **Hackathon Demo Video Production (`/Users/mac/bine-demo-video`)**:
+      - Delivered the official 3-minute hackathon demo video (`bine-demo-video-1080p.mp4`, 1920x1080, 30fps, 5.09 MB, 180.00s exact) adhering strictly to the code freeze (zero edits to `backend/` or `frontend/` source).
+      - Zero AI-generated media (no AI video, voice, TTS, images, or music); built exclusively from real Playwright 1080p screen captures of `https://bine-t5tk.vercel.app`, BscScan receipts, real macOS terminal screencasts, and deterministic HyperFrames code motion.
+      - 100% truth and provenance binding (`facts.json` and `sources.json`) mapping all 30+ figures, hashes, and dates 1-to-1 against repo files.
+      - All standing copy rules enforced: 0 em dashes, 0 raw underscores outside `[data-raw-code]`, max 12 words per screen, and dynamic burned-in subtitle track aligned with `captions.srt` (24 cues, 381 spoken words).
+      - Verified end-to-end via automated test suite `verify-delivery.js` and 2 fps tiled contact sheet `contact-sheet-rendered.png`.
+    - **Demo Video V2 Production & Final Delivery (`/Users/mac/bine-demo-video`)**:
+      - Maintained code freeze on `/Users/mac/Bine` (0 edits to `backend/` or `frontend/`).
+      - Completed live site DOM inspection: extracted 4x high-res assets (`assets/logo/header-logo-light-4x.png`, `header-tile-light-4x.png`, `favicon.svg`), confirming live logo uses monochrome `#000000` tile with `LiquidMetal` chrome shader and `linear-gradient` fallback masked with `bine-mark.png`.
+      - Completed reference video analysis (`reference/vano.mp4`, `reference/funded.mp4`) and codified motion design metrics in `motion-notes.md`.
+      - Extracted and integrated corrected audio pack v2 (`bine-audio-master.m4a`, 148.239s exact master audio track, LUFS -14).
+      - Replaced mock motion test figures with real high-res captures from `https://bine-t5tk.vercel.app` recorded post-Trade permission fix (`NVDAon via Ondo`, all-in price, spread, 8 of 8 checks, pool depth).
+      - Bound swap figures to `docs/live_swap_*.json` (`-0.13 bps` for Swap 1, `-0.53 bps` for Swap 2 vs quoted shares; both strictly within 1 bp of quote).
+      - Verified user-facing copy: 0 instances of calling $6 a minimum (accurately labeled as live trade cap, with $5 being Ondo's issuer minimum).
+      - Assembled master HyperFrames composition (`project/index.html`) across 11 scenes with 3D camera staging, animated Bezier cursor, 40-cue subtitle burner pill, frame-synced SFX (`ding_buy.wav`, `denied_refuse.wav`, `click.wav`, `whoosh_short.wav`), and 0 layout/contrast errors (`91/91` WCAG AA text checks pass).
+      - Rendered final video to `/Users/mac/bine-demo-video/bine-demo-v2-1080p.mp4` (1920x1080 @ 60fps, 148.25s exact duration, 28.0 MB, H.264 High + stereo 48 kHz AAC).
+      - Verified via 2 fps tiled contact sheet `contact-sheet-v2-rendered.png` and 11 sampled scene keyframes in artifacts directory.
 
 ## 5. Recent Changes
 - **2026-10-02 (Item 1 - State Check & Dead Code Trim)**:
@@ -188,14 +205,34 @@
 - **Permission Errors Routed to HTTP 503**: Binance `40104` / HTTP `403` permission errors raise `AuthError` and return HTTP 503 naming the missing permission instead of falling through to a `depth_thin` refusal.
 
 ## 7. Known Issues & Domain Quirks
+- **2026-10-10 (Background Probe Feed, Remote Store Publisher, & VPS Deploy on `vps-and-fixes`)**:
+  - **Standing Rules Update (`SKILL.md`)**: Expanded `.agents/skills/bine-ui-standing-rules/SKILL.md` to 7 standing rules, adding Rule 6 (Distinguish issuer minimums from safety caps) and Rule 7 (Real captured states & provenance binding for media/demos).
+  - **Probe Publisher (`backend/bine/cli.py`)**: Added sequential quote delay (1.0s), automatic 3.0s backoff and retry on HTTP 429, and `publish_probe_results_to_store()` writing the last 24h of probes as a single JSON document to Upstash Redis REST (`EX 86400` TTL). Failure to publish logs a warning without crashing the probe.
+  - **Store Read Path (`backend/bine/app.py`)**: Updated `GET /api/recent` to read from the remote store with a 60s in-memory cache, returning an honest empty state (`"No background probes recorded in the last 24 hours."`) if unconfigured, empty, or unreachable.
+  - **Copy Truthfulness (`frontend/src/pages/Refusals.tsx`)**: Aligned empty state to `"No background probes recorded in the last 24 hours."`, removed any mention of VPS or timer host, and gated `"last probe: N minutes ago"` to render only when verified data exists.
+  - **VPS Installation (`~/apps/bine`)**: Cloned and synced under user `sheriff` (not root), created `uv` virtualenv, passed all 62 tests (`62 passed in 3.85s`), provisioned `/etc/bine/bine.env` (file mode 0600, owned by `sheriff:sheriff`), and installed/enabled `bine-probe.service` and `bine-probe.timer` running every 30 minutes via systemd. Sentinel's pm2 app was completely untouched.
+  - **Geoblock Finding**: Verified that the VPS host IP (located in the United States) is geoblocked by Binance Web3 API with business error `[40304] Service not available due to compliance restriction`. Because of this regional restriction, probes executed on the US VPS return compliance refusals rather than live quotes.
+
+## 6. Important Decisions
+- **Public Demo Lock (`BINE_PUBLIC_DEMO=true`)**: Guarantees that public VPS or Vercel deployments cannot execute live swaps.
+- **Trusted Reverse Proxy IP Resolution**: Only trusts `X-Forwarded-For` from configured `trusted_proxies` (`127.0.0.1,::1`), preventing IP spoofing while isolating client rate limits.
+- **Derived Session Logic**: Market sessions are deterministically derived from UTC timestamps (US regular trading hours: 13:30–20:00 UTC Monday through Friday).
+- **Permission Errors Routed to HTTP 503**: Binance `40104` / HTTP `403` permission errors raise `AuthError` and return HTTP 503 naming the missing permission instead of falling through to a `depth_thin` refusal.
+- **Honest Probe Empty State**: When the remote store is unconfigured, unreachable, or empty, `/api/recent` and the UI return an empty list with `"No background probes recorded in the last 24 hours."` without fabricating entries or mentioning server infrastructure.
+
+## 7. Known Issues & Domain Quirks
 - **Vercel Aggregator Route Failure**: `/api/v1/dex/aggregator/quote` returns `route=None` on Vercel edge/serverless runtimes for NVDA $5.50, causing a fallback `depth_thin` refusal on the hosted site while local execution returns BUY.
+- **US VPS Regional Geoblock (`[40304]`)**: Binance Web3 REST API rejects requests from United States IP addresses with `[40304] Service not available due to compliance restriction`. Background probes running directly from a US VPS cannot fetch live Binance quotes without an egress proxy in a supported region.
 
 ## 8. Current Task
-- Completed mapping of Binance error code 40104 and HTTP 403 permission errors to AuthError returning 503 with named missing permission.
-- 60/60 pytest tests passing.
+- Completed Phase 1: Installed BINE under `~/apps/bine` on VPS as user `sheriff`, `uv` venv with 62/62 tests passing, `/etc/bine/bine.env` mode 0600.
+- Configured and activated `bine-probe.timer` running every 30 minutes.
+- Implemented probe publisher with 429 retry and Upstash Redis REST 24h document export.
+- Updated `/api/recent` read path with 60s cache and truthful empty state fallback.
+- Updated Refusals empty-state copy to `"No background probes recorded in the last 24 hours."` with zero em dashes and zero raw underscores.
 
 ## 9. Next Steps
-1. User reviews commit on branch `vps-and-fixes`.
+1. Report Phase 1 completion, `systemctl list-timers`, journald output, and regional geoblock finding to the user.
 
 ## 10. Important Files
 - `memory.md` - Primary AI context and handoff state.

@@ -1,18 +1,19 @@
 ---
 name: bine-ui-standing-rules
 description: >-
-  Enforces the 5 standing Bine frontend UI rules across all routes and components:
+  Enforces the 7 standing Bine frontend UI and media rules across all routes and components:
   (1) zero displayed underscores outside [data-raw-code], (2) consistent BineLogoTile
   rendering and exact left-edge alignment across nav and footer, (3) readable liquid-glass
   cards with inner contrast plates and one-card-per-stack interaction, (4) derive counts
-  from data, never hard-code them, and (5) mandatory real-browser CDP inspection and
-  verification before committing frontend changes.
+  from data, never hard-code them, (5) mandatory real-browser CDP inspection and
+  verification before committing frontend changes, (6) distinguish issuer minimums from
+  safety caps, and (7) real captured states and provenance binding for media and demos.
 ---
 
 # Bine Frontend Standing Rules (`bine-ui-standing-rules`)
 
 ## Overview
-Activate this skill whenever creating, editing, or auditing frontend code (`frontend/src/`) or UI documentation in Bine. These 5 standing rules prevent regressions in copy clarity, brand consistency, glass readability, data-driven counts, and browser verification.
+Activate this skill whenever creating, editing, or auditing frontend code (`frontend/src/`) or UI documentation in Bine. These 7 standing rules prevent regressions in copy clarity, brand consistency, glass readability, data-driven counts, browser verification, cap terminology, and demo ground truth.
 
 ## Standing Rules
 
@@ -58,5 +59,19 @@ Activate this skill whenever creating, editing, or auditing frontend code (`fron
   4. `backend/.venv/bin/python scripts/verify_glass_and_perf.py` -> `OVERFLOW_FAILURES=0`, `CONTRAST_FAILURES=0`, `initial_panel_open: false`, `glass_panel_opened: true`, `0` long tasks `> 50 ms`, and 30 `glass_<page>_<theme>_<width>.png` screenshots captured from real clicks and visually inspected
   5. `grep -rn "—" frontend/src/` -> `0` matches
   6. `npm --prefix frontend run build` -> main JS chunk `<= 480 kB` raw
+
+### 6. Distinguish Issuer Minimums from Safety Caps
+- **Rule**: Never refer to a safety ceiling or trade cap as a "minimum". Upstream issuer floors ($5.00 Ondo minimum [40375]; $0.01 bStocks tie-break floor) are minimums. BINE safety caps ($6.00 single-trade cap `BINE_MAX_TRADE_USD`, $10.00 daily cap `BINE_DAILY_CAP_USD`, $2,500.00 single-quote cap) are caps.
+- **Implementation**:
+  - In user-facing UI, documentation, and video copy, use "live trade cap" or "safety cap" for $6.00 / $10.00 / $2,500.00.
+  - Reserve "minimum order" exclusively for issuer order rejection thresholds.
+
+### 7. Real Captured States & Provenance Binding for Media/Demos
+- **Rule**: When creating demo videos, screenshots, or visual assets for BINE, never construct synthetic HTML result boxes with placeholder figures. Always capture and embed real product states recorded from the live/hosted application after verified fixes.
+- **Implementation**:
+  - Every on-screen number, symbol, address, and date must trace back to a verified file cited in `sources.json`.
+  - For live swaps, calculate execution accuracy directly from receipts (`docs/live_swap_*.json`), labeling deltas in plain words (e.g., "within 1 bp of quote").
+  - In HyperFrames video builds, scene timing must strictly follow the master audio timeline ("picture follows audio"), inactive scenes must unmount with `visibility: hidden; display: none;`, and audio element durations must match media length to the decimal.
+
 
 

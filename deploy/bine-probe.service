@@ -1,19 +1,20 @@
 [Unit]
 Description=BINE Scheduled Market Probe
-After=network.target bine-api.service
+After=network.target
 
 [Service]
 Type=oneshot
-User=deploy
-Group=deploy
-WorkingDirectory=/srv/bine/backend
+User=sheriff
+Group=sheriff
+WorkingDirectory=/home/sheriff/apps/bine/backend
 EnvironmentFile=-/etc/bine/bine.env
-ExecStart=/srv/bine/backend/.venv/bin/python -m bine.cli probe --scheduled
-TimeoutSec=180
+ExecStart=/home/sheriff/apps/bine/.venv/bin/python -m bine.cli probe --scheduled
+TimeoutSec=300
 
 # Security sandboxing
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/bine /tmp
+ProtectHome=read-only
+ReadWritePaths=/home/sheriff/apps/bine /tmp
 PrivateTmp=true
+

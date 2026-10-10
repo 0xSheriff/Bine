@@ -127,6 +127,101 @@ def test_api_recent_endpoint() -> None:
     assert isinstance(data["checks"], list)
 
 
+def test_api_recent_with_upstash_store(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+    import respx
+    from httpx import Response
+    import bine.app as app_mod
+
+    app_mod._RECENT_CACHE = None
+    fake_url = "https://fake-upstash.io"
+    fake_token = "fake-token"
+    monkeypatch.setenv("UPSTASH_REDIS_REST_URL", fake_url)
+    monkeypatch.setenv("UPSTASH_REDIS_REST_TOKEN", fake_token)
+
+    mock_doc = {
+        "count": 1,
+        "hours": 24,
+        "updated_at": "2026-10-10T10:00:00Z",
+        "checks": [
+            {
+                "id": 101,
+                "created_at": "2026-10-10T10:00:00Z",
+                "ticker": "NVDA",
+                "amount_usd": 5.50,
+                "action": "scheduled",
+                "verdict": "BUY",
+                "recommended_platform": "ondo",
+                "recommended_symbol": "NVDAon",
+                "recommended_contract_address": "0x123",
+                "refusal_code": None,
+                "reason": "OK",
+            }
+        ],
+    }
+
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.get(f"{fake_url}/get/probe:recent_24h").mock(
+            return_value=Response(200, json={"result": json.dumps(mock_doc)})
+        )
+        client = TestClient(app)
+        resp = client.get("/api/recent?hours=24&limit=10")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 1
+        assert data["checks"][0]["ticker"] == "NVDA"
+
+        # Cached response
+        resp2 = client.get("/api/recent?hours=24&limit=10")
+        assert resp2.status_code == 200
+        assert resp2.json()["count"] == 1
+
+    # Empty store returns honest message and empty list
+    app_mod._RECENT_CACHE = None
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.get(f"{fake_url}/get/probe:recent_24h").mock(
+            return_value=Response(200, json={"result": None})
+        )
+        client = TestClient(app)
+        resp_empty = client.get("/api/recent?hours=24&limit=10")
+        assert resp_empty.status_code == 200
+        data_empty = resp_empty.json()
+        assert data_empty["count"] == 0
+        assert data_empty["checks"] == []
+        assert data_empty["message"] == "No background probes recorded in the last 24 hours."
+
+    app_mod._RECENT_CACHE = None
+
+
+@pytest.mark.asyncio
+async def test_publish_probe_results_to_store_handles_unconfigured_and_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import respx
+    from httpx import Response
+    from bine.cli import publish_probe_results_to_store
+
+    # 1. Unconfigured: does not raise
+    monkeypatch.delenv("UPSTASH_REDIS_REST_URL", raising=False)
+    monkeypatch.delenv("UPSTASH_REDIS_REST_TOKEN", raising=False)
+    await publish_probe_results_to_store()
+
+    # 2. Configured and successful
+    fake_url = "https://fake-upstash.io"
+    fake_token = "fake-token"
+    monkeypatch.setenv("UPSTASH_REDIS_REST_URL", fake_url)
+    monkeypatch.setenv("UPSTASH_REDIS_REST_TOKEN", fake_token)
+
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.post(fake_url).mock(return_value=Response(200, json={"result": "OK"}))
+        await publish_probe_results_to_store()
+
+    # 3. Upstash error: logs warning, does not crash
+    with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.post(fake_url).mock(return_value=Response(500, text="Internal Server Error"))
+        await publish_probe_results_to_store()
+
+
 def test_cli_probe_command_parsing() -> None:
     from bine.cli import build_parser
 

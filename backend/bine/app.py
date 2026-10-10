@@ -23,6 +23,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Literal
 
+import httpx
+
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -685,6 +687,10 @@ async def list_decisions(
     return {"count": len(items), "decisions": items}
 
 
+_RECENT_CACHE: tuple[float, dict[str, Any]] | None = None
+_RECENT_CACHE_TTL_SEC = 60.0
+
+
 @app.get("/api/recent")
 async def recent_checks(
     request: Request,
@@ -692,7 +698,44 @@ async def recent_checks(
     hours: int = Query(24, ge=1, le=168),
 ) -> dict[str, Any]:
     """Return live and scheduled market checks from the last 24 hours."""
+    global _RECENT_CACHE
     _check_rate_limit(request, "recent", QUOTE_RATE_LIMIT_PER_MIN)
+
+    upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL")
+    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+
+    if upstash_url and upstash_token:
+        now_mono = _time.monotonic()
+        if _RECENT_CACHE is not None and (now_mono - _RECENT_CACHE[0]) < _RECENT_CACHE_TTL_SEC:
+            return _RECENT_CACHE[1]
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as hc:
+                resp = await hc.get(
+                    f"{upstash_url.rstrip('/')}/get/probe:recent_24h",
+                    headers={"Authorization": f"Bearer {upstash_token}"},
+                )
+                if resp.status_code == 200:
+                    body = resp.json()
+                    raw_val = body.get("result")
+                    if raw_val and isinstance(raw_val, str):
+                        doc = json.loads(raw_val)
+                        if isinstance(doc, dict) and "checks" in doc:
+                            checks = doc.get("checks") or []
+                            if len(checks) > limit:
+                                doc = {**doc, "count": limit, "checks": checks[:limit]}
+                            _RECENT_CACHE = (now_mono, doc)
+                            return doc
+        except Exception as exc:
+            logger.warning("Upstash REST read failed for /api/recent: %s", exc)
+
+        return {
+            "count": 0,
+            "hours": hours,
+            "checks": [],
+            "message": "No background probes recorded in the last 24 hours.",
+        }
+
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     try:
         async with AsyncSessionLocal() as session:
@@ -706,7 +749,12 @@ async def recent_checks(
             rows = list(result.scalars().all())
     except Exception as exc:
         logger.warning("recent_checks DB query failed (returning empty list): %s", exc)
-        return {"count": 0, "hours": hours, "checks": []}
+        return {
+            "count": 0,
+            "hours": hours,
+            "checks": [],
+            "message": "No background probes recorded in the last 24 hours.",
+        }
 
     checks = []
     for r in rows:
@@ -730,7 +778,12 @@ async def recent_checks(
                 "tx_hash": r.tx_hash,
             }
         )
-    return {"count": len(checks), "hours": hours, "checks": checks}
+    return {
+        "count": len(checks),
+        "hours": hours,
+        "checks": checks,
+        "message": "" if checks else "No background probes recorded in the last 24 hours.",
+    }
 
 
 @app.get("/api/decisions/{decision_id}")

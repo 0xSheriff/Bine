@@ -485,9 +485,11 @@ export default function Refusals() {
                 <h2 id="recent-checks-heading" className="text-lg font-semibold m-0">
                   Last 24 hours (live) ({recentChecksData?.checks.length ?? 0})
                 </h2>
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Automated background probe checks recorded by the server.
-                </span>
+                {recentChecksData?.checks && recentChecksData.checks.length > 0 ? (
+                  <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                    last probe: {formatSecondsAgo(recentChecksData.checks[0].created_at)}
+                  </span>
+                ) : null}
               </div>
 
               {!recentChecksData || recentChecksData.checks.length === 0 ? (
@@ -499,7 +501,7 @@ export default function Refusals() {
                     color: 'var(--text-secondary)',
                   }}
                 >
-                  No automated probe checks recorded in the last 24 hours. The scheduled probe timer runs periodically on the VPS.
+                  No background probes recorded in the last 24 hours.
                 </div>
               ) : (
                 <div className="space-y-3">

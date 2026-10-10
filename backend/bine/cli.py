@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import datetime, timedelta, timezone
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ import sys
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 
 from bine.app import _resolve_ticker_samples
 from bine.client import BinanceClient, maybe_enable_dev_dns_fallback
@@ -31,6 +33,7 @@ from bine.quote_engine import (
     fetch_live_issuer_quote_and_liquidity,
 )
 
+logger = logging.getLogger(__name__)
 
 DEFAULT_BINE_API_URL = "http://localhost:8000"
 
@@ -319,6 +322,79 @@ def _cmd_buy(args: argparse.Namespace) -> int:
 DEFAULT_PROBE_TICKERS = ["NVDA", "SPY", "AAPL", "KLAC", "NFLX", "PPLT", "CVNA", "NOW"]
 
 
+async def publish_probe_results_to_store(settings: Settings | None = None) -> None:
+    """Publish the last 24 hours of probe results as a single JSON document to Upstash Redis REST.
+
+    Failure to publish must not crash the probe.
+    """
+    upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL")
+    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    if not upstash_url or not upstash_token:
+        logger.info("Upstash Redis REST not configured; skipping remote publish.")
+        return
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    checks: list[dict[str, Any]] = []
+    try:
+        await init_db()
+        async with AsyncSessionLocal() as session:
+            q = (
+                select(DecisionLog)
+                .where(DecisionLog.created_at >= cutoff)
+                .order_by(DecisionLog.id.desc())
+                .limit(100)
+            )
+            result = await session.execute(q)
+            rows = list(result.scalars().all())
+            for r in rows:
+                checks.append(
+                    {
+                        "id": r.id,
+                        "created_at": r.created_at.astimezone(timezone.utc).isoformat() if r.created_at else None,
+                        "ticker": r.ticker,
+                        "amount_usd": r.amount_usd,
+                        "action": r.action,
+                        "verdict": r.verdict,
+                        "recommended_platform": r.recommended_platform,
+                        "recommended_symbol": r.recommended_symbol,
+                        "recommended_contract_address": r.recommended_contract_address,
+                        "refusal_code": r.refusal_code,
+                        "reason": r.reason,
+                        "expected_shares": r.expected_shares,
+                        "all_in_price_per_share_usd": r.all_in_price_per_share_usd,
+                        "all_in_vs_reference_pct": r.all_in_vs_reference_pct,
+                        "effective_slippage_pct": r.effective_slippage_pct,
+                        "tx_hash": r.tx_hash,
+                    }
+                )
+    except Exception as exc:
+        logger.warning("Failed to collect recent probe checks for publishing: %s", exc)
+        return
+
+    payload = {
+        "count": len(checks),
+        "hours": 24,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "checks": checks,
+    }
+    payload_str = json.dumps(payload)
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as hc:
+            resp = await hc.post(
+                upstash_url.rstrip("/"),
+                headers={
+                    "Authorization": f"Bearer {upstash_token}",
+                    "Content-Type": "application/json",
+                },
+                json=["SET", "probe:recent_24h", payload_str, "EX", "86400"],
+            )
+            resp.raise_for_status()
+            logger.info("Published %d probe checks to remote store (HTTP %d).", len(checks), resp.status_code)
+    except Exception as exc:
+        logger.warning("Failed to publish probe results to remote store: %s", exc)
+
+
 async def run_probe(
     tickers: list[str] | None = None,
     amount_usd: float = 5.50,
@@ -334,8 +410,24 @@ async def run_probe(
 
     for ticker in target_tickers:
         ticker_clean = ticker.strip().upper()
-        try:
-            quote = await run_check(ticker_clean, amount_usd, settings=cfg, include_details=True)
+        quote: dict[str, Any] | None = None
+        last_exc: Exception | None = None
+
+        for attempt in range(1, 3):
+            try:
+                quote = await run_check(ticker_clean, amount_usd, settings=cfg, include_details=True)
+                break
+            except Exception as exc:
+                last_exc = exc
+                exc_str = str(exc).lower()
+                is_429 = "429" in exc_str or "rate limit" in exc_str or getattr(exc, "code", None) == 42900 or getattr(exc, "status_code", None) == 429
+                if is_429 and attempt == 1:
+                    logger.warning("Probe rate limited on %s (attempt 1/2); waiting 3s before retry...", ticker_clean)
+                    await asyncio.sleep(3.0)
+                    continue
+                break
+
+        if quote is not None:
             verdict = quote.get("verdict", "UNKNOWN")
             refusal = quote.get("refusal") or {}
             refusal_code = refusal.get("code")
@@ -369,7 +461,7 @@ async def run_probe(
                     session.add(log_entry)
                     await session.commit()
             except Exception as exc:
-                logging.getLogger(__name__).warning("Failed to record probe into decision_log: %s", exc)
+                logger.warning("Failed to record probe into decision_log: %s", exc)
 
             results.append(
                 {
@@ -380,18 +472,23 @@ async def run_probe(
                     "summary": format_plain_check_line(quote),
                 }
             )
-        except Exception as exc:
+        else:
             results.append(
                 {
                     "ticker": ticker_clean,
                     "amount_usd": amount_usd,
                     "verdict": "ERROR",
                     "refusal_code": "error",
-                    "summary": f"Probe error for {ticker_clean}: {exc}",
+                    "summary": f"Probe error for {ticker_clean}: {last_exc}",
                 }
             )
-        # Gentle pacing between probes
-        await asyncio.sleep(0.5)
+
+        # Gentle sequential pacing between probes
+        await asyncio.sleep(1.0)
+
+    # Publish recent 24h results to store if scheduled or configured
+    if scheduled or os.environ.get("UPSTASH_REDIS_REST_URL"):
+        await publish_probe_results_to_store(cfg)
 
     return results
 

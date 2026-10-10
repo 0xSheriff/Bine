@@ -9,8 +9,8 @@ Every US stock on BNB Chain can be issued by more than one provider (`Ondo Globa
 
 Live app: https://bine-t5tk.vercel.app (checks tokenized stocks on BNB Chain before you trade)
 
-- Demo video: TODO
-- Docs site: TODO
+- Demo video: https://x.com/0xearthh/status/2108855666081210686
+- Developers and docs: visit https://bine-t5tk.vercel.app/integrate or browse the docs-site/ folder in the repo.
 
 ## Why a Pre-Trade Guard Exists
 
